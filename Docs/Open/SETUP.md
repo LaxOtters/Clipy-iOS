@@ -18,6 +18,22 @@ mise exec -- tuist version
 mise exec -- tuist generate
 ```
 
+## Baseline 검증
+
+project 생성과 AppMain test build를 한 번에 확인할 때는 아래 script를 씁니다.
+
+```sh
+./scripts/validate_ios_baseline.sh
+```
+
+script는 기본으로 simulator를 띄우지 않는 `build-for-testing`을 실행합니다. PR CI에서는 이 빠른 기준선을 사용합니다.
+실제로 test를 실행해야 할 때는 `CLIPY_IOS_VALIDATION_MODE=test`를 지정합니다.
+
+```sh
+CLIPY_IOS_VALIDATION_MODE=test \
+  ./scripts/validate_ios_baseline.sh
+```
+
 ## Test
 
 ```sh
@@ -28,6 +44,11 @@ xcodebuild test \
 ```
 
 로컬에 같은 simulator가 없으면 설치된 iPhone simulator로 바꿔서 실행합니다.
+
+## CI
+
+GitHub Actions에서는 `iOS Baseline` workflow가 같은 baseline script를 실행합니다.
+CI도 Tuist manifest를 기준으로 project를 생성하고 `AppMain` test bundle이 build 가능한지 확인합니다. simulator를 띄우는 full test는 필요한 PR에서 `CLIPY_IOS_VALIDATION_MODE=test`로 별도 확인합니다.
 
 ## Generated files
 

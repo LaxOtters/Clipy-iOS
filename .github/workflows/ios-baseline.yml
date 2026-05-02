@@ -1,0 +1,42 @@
+name: iOS Baseline
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ios-baseline.yml"
+      - ".mise.toml"
+      - "Tuist.swift"
+      - "Workspace.swift"
+      - "Tuist/**"
+      - "Modules/**"
+      - "scripts/validate_ios_baseline.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mise
+        run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install tools
+        run: |
+          mise trust --yes
+          mise install
+
+      - name: Validate iOS baseline
+        run: ./scripts/validate_ios_baseline.sh
