@@ -31,7 +31,7 @@
 필요 없는 항목은 지우지 말고 그대로 둡니다.
 
 - [ ] `mise exec -- tuist generate`
-- [ ] `./scripts/validate_ios_baseline.sh` 또는 `Docs/Open/SETUP.md`의 test command 확인
+- [ ] `./scripts/validate_ios_baseline.sh` 또는 필요한 경우 `CLIPY_IOS_VALIDATION_MODE=test ./scripts/validate_ios_baseline.sh` 확인
 - [ ] 화면 변경이 있으면 simulator에서 happy path 확인
 - [ ] 새 dependency가 있다면 추가 이유 확인
 - [ ] 생성된 `.xcodeproj`, `.xcworkspace`, `Derived/` 미포함 확인
