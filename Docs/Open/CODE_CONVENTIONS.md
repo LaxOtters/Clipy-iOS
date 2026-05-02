@@ -31,3 +31,92 @@ Modules/AppMain
 
 아직 필요하지 않은 module은 미리 만들지 않습니다.
 새 module을 추가할 때는 책임을 먼저 정하고, 의존 방향을 같이 정합니다.
+
+### Module 추가 기준
+
+새 module은 아래 조건이 맞을 때 추가합니다.
+
+- 실제 구현 작업에서 책임이 필요합니다.
+- module 책임을 한 문장으로 설명할 수 있습니다.
+- Tuist `Project.swift`, scheme, test target 기준을 함께 정할 수 있습니다.
+- 다른 작업 범위의 구현을 미리 당겨오지 않습니다.
+- 빈 target이나 빈 directory만 만들지 않습니다.
+
+### 기본 의존 방향
+
+```plaintext
+AppMain -> Feature -> Core
+AppMain -> Core
+Feature -x-> Feature
+Core -x-> Feature
+```
+
+`AppMain`은 app 실행과 조립을 맡습니다.
+제품 규칙, 저장, WebView primitive, 공용 UI primitive는 Core 계열에서 다룹니다.
+Home과 Session처럼 사용자가 만나는 흐름은 Feature 계열에서 다룹니다.
+
+Feature module끼리는 직접 의존하지 않습니다.
+공유가 필요하면 먼저 Core로 올릴 책임인지, 아니면 아직 같은 Feature 안에 있어도 되는지 봅니다.
+
+### DI 기준
+
+DIContainer는 `AppMain`에서 시작합니다.
+`AppMain`은 app의 composition root로 보고, Core 구현체와 Feature entry point를 조립합니다.
+
+Feature는 container를 직접 들고 다니지 않습니다.
+필요한 의존성은 initializer, factory, dependencies object로 받습니다.
+
+좋은 방향입니다:
+
+```swift
+let viewModel = HomeViewModel(
+    startNewSession: startNewSessionUseCase,
+    loadSessions: loadSessionsUseCase
+)
+```
+
+피할 방향입니다:
+
+```swift
+let viewModel = HomeViewModel(container: appDIContainer)
+```
+
+초기에는 별도 DI module을 만들지 않습니다.
+DI 타입이 여러 Feature에서 반복되고 `AppMain`만으로 조립 기준을 설명하기 어려워질 때만 작은 공유 module을 검토합니다.
+
+### Clean Architecture 기준
+
+Clean Architecture는 폴더 이름보다 의존 방향을 먼저 지킵니다.
+
+기본 흐름은 아래처럼 둡니다.
+
+```plaintext
+Feature UI
+  -> UseCase
+  -> Repository Protocol
+       <- Repository Implementation
+            -> Local DB / Web / Cache
+```
+
+`CoreDomain`은 entity, value object, 상태 전이 규칙, use case, repository protocol을 둡니다.
+`CorePersistence`는 repository 구현체와 record mapping을 둡니다.
+`CoreWeb`은 WebView, URL validation, capture 같은 platform primitive를 둡니다.
+
+Feature는 UIKit 화면과 사용자 action 처리에 집중합니다.
+Feature에서 local DB 구현체나 저장 schema를 직접 알지 않게 합니다.
+
+### Session 중심 구조
+
+Clipy는 Session 중심 앱입니다.
+Home은 세션 진입과 관리에 집중하고, 대부분의 탐색, 수집, 비교, 결정, 리뷰는 Session 안에서 처리합니다.
+
+그래서 아래 surface는 초기 기준에서 `FeatureSession` 책임으로 봅니다.
+
+- WebView surface
+- Contextual Overlay Actions
+- Comparison Bottom Sheet
+- Decision Screen
+- Overlay Editor
+
+`Decision Screen`과 `Overlay Editor`는 Session 내부 full-screen surface입니다.
+별도 app-level feature module로 먼저 분리하지 않습니다.
