@@ -7,7 +7,12 @@
 
 import UIKit
 
+import FeatureSession
+
 final class ClipyRootViewController: UIViewController {
+    private let sampleSessionId = UUID()
+    private let sessionSmokeURL = URL(string: "https://www.google.com")
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -24,7 +29,12 @@ final class ClipyRootViewController: UIViewController {
         subtitleLabel.textColor = .secondaryLabel
         subtitleLabel.textAlignment = .center
 
-        let stackView = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        let openSessionButton = UIButton(type: .system)
+        openSessionButton.setTitle("Open Session", for: .normal)
+        openSessionButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        openSessionButton.addTarget(self, action: #selector(openSession), for: .touchUpInside)
+
+        let stackView = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, openSessionButton])
         stackView.axis = .vertical
         stackView.alignment = .center
         stackView.spacing = 12
@@ -38,5 +48,15 @@ final class ClipyRootViewController: UIViewController {
             stackView.leadingAnchor.constraint(greaterThanOrEqualTo: view.layoutMarginsGuide.leadingAnchor),
             stackView.trailingAnchor.constraint(lessThanOrEqualTo: view.layoutMarginsGuide.trailingAnchor)
         ])
+    }
+
+    @objc private func openSession() {
+        let context = SessionLaunchContext(
+            sessionId: sampleSessionId,
+            initialURL: sessionSmokeURL
+        )
+        let viewController = SessionFeature.makeViewController(context: context)
+
+        navigationController?.pushViewController(viewController, animated: true)
     }
 }

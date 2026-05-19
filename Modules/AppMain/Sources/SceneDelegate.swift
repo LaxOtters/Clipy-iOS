@@ -20,7 +20,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = ClipyRootViewController()
+        let navigationController = UINavigationController(rootViewController: ClipyRootViewController())
+        navigationController.setNavigationBarHidden(true, animated: false)
+        window.rootViewController = navigationController
         window.makeKeyAndVisible()
         self.window = window
     }
