@@ -16,6 +16,9 @@ final class SessionWebView: UIView {
         stateRelay.asDriver()
     }
 
+    var navigationFailure: Signal<SessionWebNavigationFailure> {
+        navigationFailureRelay.asSignal()
+    }
 
     var currentURL: URL? {
         webView.url
@@ -27,6 +30,7 @@ final class SessionWebView: UIView {
 
     private let webView: WKWebView
     private let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
+    private let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     private var observations: [NSKeyValueObservation] = []
 
     override init(frame: CGRect) {
@@ -110,6 +114,9 @@ extension SessionWebView: WKNavigationDelegate {
         withError error: Error
     ) {
         emitState()
+        navigationFailureRelay.accept(
+            .committed(SessionWebNavigationFailureContext(error: error))
+        )
     }
 
     func webView(
@@ -118,5 +125,8 @@ extension SessionWebView: WKNavigationDelegate {
         withError error: Error
     ) {
         emitState()
+        navigationFailureRelay.accept(
+            .provisional(SessionWebNavigationFailureContext(error: error))
+        )
     }
 }
