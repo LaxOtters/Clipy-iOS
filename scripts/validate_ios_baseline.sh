@@ -82,8 +82,16 @@ echo "Using destination: ${DESTINATION}"
 
 mise exec -- tuist install
 mise exec -- tuist generate
-xcodebuild "$ACTION" \
-  -workspace "$WORKSPACE" \
-  -scheme "$SCHEME" \
-  -destination "$DESTINATION" \
-  "${XCODEBUILD_ARGS[@]}"
+
+if ((${#XCODEBUILD_ARGS[@]})); then
+  xcodebuild "$ACTION" \
+    -workspace "$WORKSPACE" \
+    -scheme "$SCHEME" \
+    -destination "$DESTINATION" \
+    "${XCODEBUILD_ARGS[@]}"
+else
+  xcodebuild "$ACTION" \
+    -workspace "$WORKSPACE" \
+    -scheme "$SCHEME" \
+    -destination "$DESTINATION"
+fi
