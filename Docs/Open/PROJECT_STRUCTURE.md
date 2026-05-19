@@ -16,6 +16,14 @@ Clipy-iOS/
       Project.swift
       Sources/
       Tests/
+    FeatureSession/
+      Project.swift
+      Sources/
+        Interface/
+        SessionView/
+        SessionWeb/
+      Tests/
+        SessionView/
     CoreDomain/
       Project.swift
       Sources/
@@ -32,12 +40,21 @@ Clipy-iOS/
 | Module | 책임 |
 | --- | --- |
 | `AppMain` | app entry point, scene lifecycle, app 조립 |
+| `FeatureSession` | Session 화면 진입, UIKit shell, WebView wrapper |
 | `CoreDomain` | Session, Item, Decision, Capture, SessionSnapshot와 repository contract |
 | `CorePersistence` | CoreData 기반 local 저장 구조, entity mapping, repository 구현 |
 
 module이 늘어나도 기본 구조는 같습니다.
-각 module은 자기 `Project.swift`, `Sources/`, `Tests/`를 가집니다.
+각 module은 자기 `Project.swift`와 `Sources/`를 가집니다.
+`Tests/`는 오래 남길 테스트가 생길 때 추가합니다.
 파일이 생기기 전의 빈 directory는 유지하지 않습니다.
+
+Feature module 내부는 public entry와 제품 기능 surface를 기준으로 나눕니다.
+`Interface/`에는 다른 module이 아는 진입 API를 둡니다.
+나머지는 `SessionView/`, `SessionWeb/`처럼 feature 내부 기능 단위로 둡니다.
+
+세부 ViewController / ViewModel 작성 기준은 팀 내부 규칙에서 관리합니다.
+공개 문서에서는 module 구조와 의존 방향만 설명합니다.
 
 ## Module 확장 기준
 
@@ -49,7 +66,7 @@ Module은 화면 수가 아니라 책임 경계를 기준으로 늘립니다.
 - 실제 구현 작업에서 책임이 필요합니다.
 - module 책임을 한 문장으로 설명할 수 있습니다.
 - 의존 방향이 기존 구조와 어긋나지 않습니다.
-- `Project.swift`, scheme, test target, 검증 방법을 함께 정할 수 있습니다.
+- `Project.swift`, scheme, 테스트 필요 여부, 검증 방법을 함께 정할 수 있습니다.
 - 다음 작업 범위의 구현을 미리 당겨오지 않습니다.
 
 ## 의존 방향
@@ -57,10 +74,12 @@ Module은 화면 수가 아니라 책임 경계를 기준으로 늘립니다.
 현재 module 의존은 아래처럼 둡니다.
 
 ```plaintext
+AppMain -> FeatureSession -> CoreDomain
 AppMain -> CorePersistence -> CoreDomain
 ```
 
 `AppMain`은 app entry point와 composition root를 맡습니다.
+`FeatureSession`은 Session 화면과 WebView wrapper를 맡습니다.
 `CorePersistence`는 `CoreDomain`의 repository contract를 CoreData로 구현합니다.
 `CoreDomain`은 저장소 구현, WebView, UIKit detail을 모릅니다.
 
@@ -132,14 +151,14 @@ Home은 세션 진입과 관리에 집중합니다.
 탐색, 수집, 비교, 결정, 리뷰는 대부분 Session 안에서 처리합니다.
 
 그래서 module은 아래 방향으로 확장될 수 있습니다.
-실제 target은 해당 책임을 가진 구현 작업이 열릴 때 만듭니다.
+실제 target은 해당 책임을 가진 구현 작업이 열릴 때 만듭니다. `FeatureSession`은 Session shell과 WebView wrapper 책임이 필요해지면서 추가했습니다.
 
 | 책임 | 예시 module |
 | --- | --- |
 | WebView, URL validation, web primitive | `CoreWeb` |
 | 공용 UIKit style/component | `CoreUI` |
 | Home, session list, start/reopen entry flow | `FeatureHome` |
-| Session screen, WebView surface, bottom sheet, Decision surface | `FeatureSession` |
+| Session screen, bottom sheet, Decision surface | `FeatureSession` |
 
 `Decision Screen`과 `Overlay Editor`는 초기 기준에서 Session 내부 surface로 봅니다.
 별도 app-level feature module로 먼저 분리하지 않습니다.
