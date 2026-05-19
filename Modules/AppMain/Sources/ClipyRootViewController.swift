@@ -9,6 +9,7 @@ import UIKit
 
 import FeatureSession
 
+/// Home 구현 전까지 세션 진입 smoke를 맡는 root 화면입니다.
 final class ClipyRootViewController: UIViewController {
     private let sampleSessionId = UUID()
     private let sessionSmokeURL = URL(string: "https://www.google.com")

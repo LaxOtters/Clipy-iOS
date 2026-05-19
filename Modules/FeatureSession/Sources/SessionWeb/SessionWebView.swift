@@ -11,6 +11,7 @@ import WebKit
 import RxCocoa
 import RxRelay
 
+/// Session 안에서 웹 탐색을 담당하고 WebKit detail을 wrapper 뒤에 숨깁니다.
 final class SessionWebView: UIView {
     var state: Driver<SessionBrowserState> {
         stateRelay.asDriver()

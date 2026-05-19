@@ -11,6 +11,7 @@ import UIKit
 import RxCocoa
 import RxSwift
 
+/// Session 화면의 header와 browser 영역을 배치하는 root view입니다.
 final class SessionView: UIView {
     fileprivate let homeButton = UIButton(type: .system)
     private let browserView = SessionWebView()

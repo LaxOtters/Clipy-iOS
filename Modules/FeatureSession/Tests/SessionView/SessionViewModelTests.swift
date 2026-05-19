@@ -13,6 +13,7 @@ import RxSwift
 
 @testable import FeatureSession
 
+/// Session 진입과 Home route가 ViewModel output으로 드러나는지 확인합니다.
 final class SessionViewModelTests: XCTestCase {
     private var disposeBag: DisposeBag!
 

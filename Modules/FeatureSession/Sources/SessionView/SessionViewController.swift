@@ -10,6 +10,7 @@ import UIKit
 import RxCocoa
 import RxSwift
 
+/// Session 화면의 lifecycle, binding, Home route 처리를 맡는 UIKit shell입니다.
 final class SessionViewController: UIViewController {
     private let rootView = SessionView()
     private let viewModel: SessionViewModel

@@ -8,10 +8,12 @@
 import Foundation
 import RxCocoa
 
+/// Session 화면에서 사용자가 의도한 화면 이동을 표현합니다.
 enum SessionRoute: Equatable {
     case home
 }
 
+/// Session 진입 입력을 WebView load command와 화면 route로 바꿉니다.
 final class SessionViewModel {
     struct Input {
         let viewDidLoad: Signal<Void>
