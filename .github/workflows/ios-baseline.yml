@@ -40,5 +40,14 @@ jobs:
           mise trust --yes
           mise install
 
+      - name: Cache Tuist dependencies
+        if: ${{ hashFiles('Tuist/Package.swift') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: Tuist/.build
+          key: tuist-dependencies-${{ runner.os }}-${{ hashFiles('Tuist/Package.swift', 'Tuist/Package.resolved') }}
+          restore-keys: |
+            tuist-dependencies-${{ runner.os }}-
+
       - name: Validate iOS baseline
         run: ./scripts/validate_ios_baseline.sh
