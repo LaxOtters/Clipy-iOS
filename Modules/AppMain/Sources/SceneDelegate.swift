@@ -7,6 +7,7 @@
 
 import UIKit
 
+/// 앱 window를 만들고 현재 root navigation 흐름을 시작합니다.
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
@@ -20,7 +21,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = ClipyRootViewController()
+        let navigationController = UINavigationController(rootViewController: ClipyRootViewController())
+        navigationController.setNavigationBarHidden(true, animated: false)
+        window.rootViewController = navigationController
         window.makeKeyAndVisible()
         self.window = window
     }
