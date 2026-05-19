@@ -8,27 +8,41 @@ SCHEME="${CLIPY_IOS_SCHEME:-AppMain}"
 WORKSPACE="${CLIPY_IOS_WORKSPACE:-Clipy.xcworkspace}"
 MODE="${CLIPY_IOS_VALIDATION_MODE:-build-for-testing}"
 DESTINATION="${CLIPY_IOS_DESTINATION:-}"
+SIMULATOR_NAME="${CLIPY_IOS_SIMULATOR_NAME:-iPhone 17 Pro}"
+DEFAULT_XCODEBUILD_QUIET="1"
 XCODEBUILD_ARGS=()
 
-if [[ "${CLIPY_XCODEBUILD_QUIET:-1}" == "1" ]]; then
+if [[ "${CI:-}" == "true" ]]; then
+  DEFAULT_XCODEBUILD_QUIET="0"
+fi
+
+if [[ "${CLIPY_XCODEBUILD_QUIET:-$DEFAULT_XCODEBUILD_QUIET}" == "1" ]]; then
   XCODEBUILD_ARGS+=("-quiet")
 fi
 
 resolve_test_destination() {
-  xcrun simctl list devices available --json | python3 -c '
+  xcrun simctl list devices available --json | CLIPY_IOS_SIMULATOR_NAME="$SIMULATOR_NAME" python3 -c '
 import json
+import os
+import re
 import sys
 
+preferred_name = os.environ.get("CLIPY_IOS_SIMULATOR_NAME", "")
 payload = json.load(sys.stdin)
-devices = [
-    device
-    for runtime_devices in payload.get("devices", {}).values()
-    for device in runtime_devices
-    if device.get("isAvailable") and device.get("name", "").startswith("iPhone")
-]
+devices = []
 
-preferred = next((device for device in devices if device.get("name") == "iPhone 17 Pro"), None)
-selected = preferred or (devices[0] if devices else None)
+
+def runtime_version(runtime):
+    return tuple(int(part) for part in re.findall(r"\d+", runtime))
+
+
+for runtime, runtime_devices in payload.get("devices", {}).items():
+    for device in runtime_devices:
+        if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+            devices.append({**device, "runtimeVersion": runtime_version(runtime)})
+
+preferred = next((device for device in devices if device.get("name") == preferred_name), None)
+selected = preferred or (max(devices, key=lambda device: (device["runtimeVersion"], device.get("name", ""))) if devices else None)
 
 if selected is None:
     raise SystemExit("No available iPhone simulator found.")
@@ -66,6 +80,7 @@ esac
 
 echo "Using destination: ${DESTINATION}"
 
+mise exec -- tuist install
 mise exec -- tuist generate
 xcodebuild "$ACTION" \
   -workspace "$WORKSPACE" \
