@@ -11,68 +11,123 @@ import XCTest
 
 /// Bottom Sheet drag action이 Session의 sheet state 정책으로 해석되는지 확인합니다.
 final class SessionBottomSheetTransitionPolicyTests: XCTestCase {
-    func test_upwardDragFromHidden_movesToPeek_forBrowsingEntryCue() {
-        var sut = SessionBottomSheetStateMachine(initialState: .hidden)
+    func test_upwardDragFromMinimized_movesToHidden_forRestoringBrowserControls() {
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: -72, velocityY: 0))
+        let state = sut.nextState(
+            from: .minimized,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
+
+        XCTAssertEqual(state, .hidden)
+    }
+
+    func test_upwardDragFromHidden_movesToPeek_forBrowsingEntryCue() {
+        let sut = SessionBottomSheetTransitionPolicy.standard
+
+        let state = sut.nextState(
+            from: .hidden,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
 
         XCTAssertEqual(state, .peek)
-        XCTAssertEqual(sut.currentState, .peek)
     }
 
     func test_upwardDragFromPeek_movesToExpanded_forComparisonEntry() {
-        var sut = SessionBottomSheetStateMachine(initialState: .peek)
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: -72, velocityY: 0))
+        let state = sut.nextState(
+            from: .peek,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
 
         XCTAssertEqual(state, .expanded)
-        XCTAssertEqual(sut.currentState, .expanded)
     }
 
     func test_downwardDragFromExpanded_movesToPeek_forReturningToBrowsing() {
-        var sut = SessionBottomSheetStateMachine(initialState: .expanded)
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: 72, velocityY: 0))
+        let state = sut.nextState(
+            from: .expanded,
+            action: .dragEnded(translationY: 72, velocityY: 0)
+        )
 
         XCTAssertEqual(state, .peek)
-        XCTAssertEqual(sut.currentState, .peek)
     }
 
     func test_downwardDragFromPeek_movesToHidden_forWebViewFocusedBrowsing() {
-        var sut = SessionBottomSheetStateMachine(initialState: .peek)
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: 72, velocityY: 0))
+        let state = sut.nextState(
+            from: .peek,
+            action: .dragEnded(translationY: 72, velocityY: 0)
+        )
 
         XCTAssertEqual(state, .hidden)
-        XCTAssertEqual(sut.currentState, .hidden)
+    }
+
+    func test_downwardDragFromHidden_movesToMinimized_forCompactBrowserChrome() {
+        let sut = SessionBottomSheetTransitionPolicy.standard
+
+        let state = sut.nextState(
+            from: .hidden,
+            action: .dragEnded(translationY: 72, velocityY: 0)
+        )
+
+        XCTAssertEqual(state, .minimized)
+    }
+
+    func test_downwardDragFromMinimized_keepsMinimized_forLowestSheetState() {
+        let sut = SessionBottomSheetTransitionPolicy.standard
+
+        let state = sut.nextState(
+            from: .minimized,
+            action: .dragEnded(translationY: 72, velocityY: 0)
+        )
+
+        XCTAssertEqual(state, .minimized)
     }
 
     func test_shortDrag_keepsCurrentState_withoutAccidentalSheetChange() {
-        var sut = SessionBottomSheetStateMachine(initialState: .peek)
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: -12, velocityY: 0))
+        let state = sut.nextState(
+            from: .peek,
+            action: .dragEnded(translationY: -12, velocityY: 0)
+        )
 
         XCTAssertEqual(state, .peek)
-        XCTAssertEqual(sut.currentState, .peek)
     }
 
-    func test_repeatedUpwardDrags_reachExpandedWithoutSkippingPeek_forStepwiseSheetPolicy() {
-        var sut = SessionBottomSheetStateMachine(initialState: .hidden)
+    func test_repeatedUpwardDrags_reachExpandedWithoutSkippingStates_forStepwiseSheetPolicy() {
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let firstState = sut.handle(.dragEnded(translationY: -72, velocityY: 0))
-        let secondState = sut.handle(.dragEnded(translationY: -72, velocityY: 0))
+        let firstState = sut.nextState(
+            from: .minimized,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
+        let secondState = sut.nextState(
+            from: firstState,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
+        let thirdState = sut.nextState(
+            from: secondState,
+            action: .dragEnded(translationY: -72, velocityY: 0)
+        )
 
-        XCTAssertEqual(firstState, .peek)
-        XCTAssertEqual(secondState, .expanded)
-        XCTAssertEqual(sut.currentState, .expanded)
+        XCTAssertEqual(firstState, .hidden)
+        XCTAssertEqual(secondState, .peek)
+        XCTAssertEqual(thirdState, .expanded)
     }
 
     func test_fastUpwardFlick_movesOneStepOnly_forPredictableSheetControl() {
-        var sut = SessionBottomSheetStateMachine(initialState: .hidden)
+        let sut = SessionBottomSheetTransitionPolicy.standard
 
-        let state = sut.handle(.dragEnded(translationY: -8, velocityY: -620))
+        let state = sut.nextState(
+            from: .hidden,
+            action: .dragEnded(translationY: -8, velocityY: -620)
+        )
 
         XCTAssertEqual(state, .peek)
-        XCTAssertEqual(sut.currentState, .peek)
     }
 }
