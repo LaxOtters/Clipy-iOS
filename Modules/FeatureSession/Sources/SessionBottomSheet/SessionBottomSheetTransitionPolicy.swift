@@ -85,23 +85,3 @@ struct SessionBottomSheetTransitionPolicy: Equatable {
         }
     }
 }
-
-/// 현재 Bottom Sheet 상태를 보관하고 policy 결과를 적용합니다.
-struct SessionBottomSheetStateMachine: Equatable {
-    private(set) var currentState: SessionBottomSheetState
-    private let policy: SessionBottomSheetTransitionPolicy
-
-    init(
-        initialState: SessionBottomSheetState = .hidden,
-        policy: SessionBottomSheetTransitionPolicy = .standard
-    ) {
-        currentState = initialState
-        self.policy = policy
-    }
-
-    mutating func handle(_ action: SessionBottomSheetAction) -> SessionBottomSheetState {
-        let nextState = policy.nextState(from: currentState, action: action)
-        currentState = nextState
-        return nextState
-    }
-}

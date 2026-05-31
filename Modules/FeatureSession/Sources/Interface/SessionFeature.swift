@@ -12,6 +12,9 @@ public enum SessionFeature {
     public static func makeViewController(
         context: SessionLaunchContext
     ) -> UIViewController {
-        SessionViewController(viewModel: SessionViewModel(context: context))
+        SessionViewController(
+            viewModel: SessionViewModel(context: context),
+            bottomSheetViewModel: SessionBottomSheetViewModel()
+        )
     }
 }
