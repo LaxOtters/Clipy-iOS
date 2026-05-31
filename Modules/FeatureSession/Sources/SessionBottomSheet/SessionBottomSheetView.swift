@@ -7,33 +7,43 @@
 
 import UIKit
 
-/// Session 화면 위에서 Hidden / Peek / Expanded 상태를 렌더링하는 Bottom Sheet primitive입니다.
-final class SessionBottomSheetView: UIView {
-    private enum Layout {
-        static let grabberWidth: CGFloat = 44
-        static let grabberHeight: CGFloat = 5
-        static let cornerRadius: CGFloat = 20
-        static let expandedOffset: CGFloat = 0
+import RxCocoa
+import RxRelay
+import RxSwift
 
-        static func accessibilityValue(for state: SessionBottomSheetState) -> String {
-            switch state {
-            case .hidden:
-                return "Hidden"
-            case .peek:
-                return "Peek"
-            case .expanded:
-                return "Expanded"
-            }
-        }
+/// Session 화면 위에서 Minimized / Hidden / Peek / Expanded 상태를 렌더링하는 Bottom Sheet primitive입니다.
+final class SessionBottomSheetView: UIView {
+    /// Bottom Sheet primitive의 고정 layout 수치입니다.
+    private enum Layout {
+        /// Grabber bar의 가로 길이입니다.
+        static let grabberWidth: CGFloat = 44
+        /// Grabber bar의 세로 높이입니다.
+        static let grabberHeight: CGFloat = 5
+        /// Drag gesture를 받을 grabber touch 영역 높이입니다.
+        static let grabberHitAreaHeight: CGFloat = 32
+        /// Sheet 상단 모서리 radius입니다.
+        static let cornerRadius: CGFloat = 20
     }
 
+    /// Grabber drag만 받기 위한 hit area입니다.
+    private let grabberHitAreaView = UIView()
+    /// 사용자가 끌어올릴 수 있음을 보여주는 시각적 grabber입니다.
     private let grabberView = UIView()
+    /// CLIPY-44 primitive에서 content 영역을 확인하기 위한 임시 title입니다.
     private let titleLabel = UILabel()
+    /// CLIPY-44 primitive에서 content 영역을 확인하기 위한 임시 설명입니다.
     private let descriptionLabel = UILabel()
+    /// 현재 Bottom Sheet content placeholder를 담는 stack view입니다.
     private let contentStackView = UIStackView()
-    private var stateMachine = SessionBottomSheetStateMachine()
-    private let layoutPolicy = SessionBottomSheetLayoutPolicy.standard
+    /// UIKit pan gesture 종료를 ViewModel input으로 넘기는 event relay입니다.
+    fileprivate let dragEndedRelay = PublishRelay<SessionBottomSheetAction>()
+    /// Bottom Sheet 상태와 drag offset을 실제 화면 수치로 바꾸는 정책입니다.
+    private let renderingPolicy = SessionBottomSheetRenderingPolicy.standard
+    /// 마지막으로 렌더링한 Bottom Sheet 상태입니다.
+    private var renderedState: SessionBottomSheetState = .peek
+    /// 현재 transform에 반영된 y축 offset입니다.
     private var currentOffset: CGFloat = 0
+    /// Drag 시작 시점의 y축 offset입니다.
     private var dragStartOffset: CGFloat = 0
 
     override init(frame: CGRect) {
@@ -51,17 +61,20 @@ final class SessionBottomSheetView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        render(state: stateMachine.currentState, animated: false)
+        render(state: renderedState, animated: false)
     }
 
+    /// Bottom Sheet를 구성하는 subview hierarchy를 만듭니다.
     private func configureHierarchy() {
-        addSubview(grabberView)
+        addSubview(grabberHitAreaView)
         addSubview(contentStackView)
 
+        grabberHitAreaView.addSubview(grabberView)
         contentStackView.addArrangedSubview(titleLabel)
         contentStackView.addArrangedSubview(descriptionLabel)
     }
 
+    /// Bottom Sheet primitive의 기본 색상과 typography를 설정합니다.
     private func configureStyle() {
         backgroundColor = .secondarySystemBackground
         layer.cornerRadius = Layout.cornerRadius
@@ -73,9 +86,6 @@ final class SessionBottomSheetView: UIView {
 
         grabberView.backgroundColor = .tertiaryLabel
         grabberView.layer.cornerRadius = Layout.grabberHeight / 2
-        grabberView.isAccessibilityElement = true
-        grabberView.accessibilityLabel = "Bottom sheet grabber"
-        grabberView.accessibilityHint = "Drag up or down to change the sheet state."
 
         contentStackView.axis = .vertical
         contentStackView.alignment = .fill
@@ -95,32 +105,40 @@ final class SessionBottomSheetView: UIView {
         accessibilityIdentifier = "sessionBottomSheet"
     }
 
+    /// Grabber hit area에 pan gesture를 연결합니다.
     private func configureGesture() {
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        addGestureRecognizer(panGesture)
+        grabberHitAreaView.addGestureRecognizer(panGesture)
     }
 
+    /// Bottom Sheet 내부 placeholder와 grabber layout을 고정합니다.
     private func configureLayout() {
+        grabberHitAreaView.translatesAutoresizingMaskIntoConstraints = false
         grabberView.translatesAutoresizingMaskIntoConstraints = false
         contentStackView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            grabberView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
-            grabberView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            grabberHitAreaView.topAnchor.constraint(equalTo: topAnchor),
+            grabberHitAreaView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            grabberHitAreaView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            grabberHitAreaView.heightAnchor.constraint(equalToConstant: Layout.grabberHitAreaHeight),
+
+            grabberView.centerXAnchor.constraint(equalTo: grabberHitAreaView.centerXAnchor),
+            grabberView.centerYAnchor.constraint(equalTo: grabberHitAreaView.centerYAnchor),
             grabberView.widthAnchor.constraint(equalToConstant: Layout.grabberWidth),
             grabberView.heightAnchor.constraint(equalToConstant: Layout.grabberHeight),
 
-            contentStackView.topAnchor.constraint(equalTo: grabberView.bottomAnchor, constant: 18),
+            contentStackView.topAnchor.constraint(equalTo: grabberHitAreaView.bottomAnchor, constant: 8),
             contentStackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentStackView.trailingAnchor.constraint(equalTo: trailingAnchor)
         ])
     }
 
+    /// Pan gesture 단계에 따라 interactive offset을 반영하거나 종료 event를 내보냅니다.
     @objc
     private func handlePan(_ gesture: UIPanGestureRecognizer) {
         switch gesture.state {
         case .began:
-            render(state: stateMachine.currentState, animated: false)
             dragStartOffset = currentOffset
         case .changed:
             let translationY = gesture.translation(in: self).y
@@ -128,24 +146,19 @@ final class SessionBottomSheetView: UIView {
         case .ended, .cancelled, .failed:
             let translationY = gesture.translation(in: self).y
             let velocityY = gesture.velocity(in: self).y
-            let state = stateMachine.handle(.dragEnded(translationY: translationY, velocityY: velocityY))
-            render(state: state, animated: true)
+            dragEndedRelay.accept(.dragEnded(translationY: translationY, velocityY: velocityY))
         case .possible:
             break
         @unknown default:
-            render(state: stateMachine.currentState, animated: true)
+            break
         }
     }
 
-    private func render(state: SessionBottomSheetState, animated: Bool) {
-        grabberView.accessibilityValue = Layout.accessibilityValue(for: state)
-        setOffset(layoutPolicy.offset(for: state, availableHeight: bounds.height), animated: animated)
-    }
-
+    /// Sheet transform에 적용할 y축 offset을 범위 안으로 보정한 뒤 반영합니다.
     private func setOffset(_ offset: CGFloat, animated: Bool) {
-        let clampedOffset = min(max(offset, Layout.expandedOffset), hiddenOffset)
+        let clampedOffset = renderingPolicy.clampedOffset(offset, availableHeight: bounds.height)
         currentOffset = clampedOffset
-        updateContentVisibility(for: clampedOffset)
+        applyContentPresentation(for: renderedState, offset: clampedOffset)
 
         let updates = {
             self.transform = CGAffineTransform(translationX: 0, y: clampedOffset)
@@ -165,17 +178,31 @@ final class SessionBottomSheetView: UIView {
         }
     }
 
-    private func updateContentVisibility(for offset: CGFloat) {
-        let travelDistance = max(1, hiddenOffset - peekOffset)
-        let visibleProgress = (hiddenOffset - offset) / travelDistance
-        contentStackView.alpha = min(max(visibleProgress, 0), 1)
+    /// 현재 상태와 offset에 맞는 content 표시 정책을 View에 적용합니다.
+    private func applyContentPresentation(for state: SessionBottomSheetState, offset: CGFloat) {
+        contentStackView.alpha = renderingPolicy.contentAlpha(
+            for: state,
+            offset: offset,
+            availableHeight: bounds.height
+        )
     }
+}
 
-    private var hiddenOffset: CGFloat {
-        layoutPolicy.offset(for: .hidden, availableHeight: bounds.height)
+// MARK: - Interface
+
+extension SessionBottomSheetView {
+    /// ViewModel이 결정한 Bottom Sheet 상태를 실제 화면 위치로 렌더링합니다.
+    func render(state: SessionBottomSheetState, animated: Bool) {
+        renderedState = state
+        setOffset(renderingPolicy.offset(for: state, availableHeight: bounds.height), animated: animated)
     }
+}
 
-    private var peekOffset: CGFloat {
-        layoutPolicy.offset(for: .peek, availableHeight: bounds.height)
+// MARK: - Reactive
+
+extension Reactive where Base: SessionBottomSheetView {
+    /// Grabber drag가 끝났을 때 ViewModel로 전달할 Bottom Sheet action입니다.
+    var dragEnded: Signal<SessionBottomSheetAction> {
+        base.dragEndedRelay.asSignal()
     }
 }
