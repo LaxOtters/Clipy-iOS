@@ -51,20 +51,33 @@ struct SessionBottomSheetPolicy: Equatable {
         let peekVisibleHeight: CGFloat
     }
 
+    /// drag progress에 따라 Peek/Expanded content를 교차 노출할 alpha 값입니다.
+    struct ContentAlpha: Equatable {
+        /// URL bar 아래 item preview 영역의 노출 정도입니다.
+        let peek: CGFloat
+        /// 화면 전체 비교 컨텐츠의 노출 정도입니다.
+        let expanded: CGFloat
+    }
+
     /// Expanded를 제외한 state별 sheet 높이입니다.
     let detents: Detents
     /// endpoint보다 방향 의도를 우선할 fast drag 속도 기준입니다.
     let velocityThreshold: CGFloat
     /// 현재 detent 주변에서 snap-back으로 볼 상하 허용 범위입니다.
     let retentionBand: CGFloat
+    /// drag progress에 따른 Peek/Expanded content cross-fade 적용 여부입니다.
+    var isContentFadeEnabled: Bool
+
     init(
         detents: Detents,
         velocityThreshold: CGFloat = 3000,
-        retentionBand: CGFloat = 20
+        retentionBand: CGFloat = 20,
+        isContentFadeEnabled: Bool = true
     ) {
         self.detents = detents
         self.velocityThreshold = velocityThreshold
         self.retentionBand = retentionBand
+        self.isContentFadeEnabled = isContentFadeEnabled
     }
 
     init(
@@ -72,7 +85,8 @@ struct SessionBottomSheetPolicy: Equatable {
         hiddenVisibleHeight: CGFloat,
         peekVisibleHeight: CGFloat,
         velocityThreshold: CGFloat = 3000,
-        retentionBand: CGFloat = 20
+        retentionBand: CGFloat = 20,
+        isContentFadeEnabled: Bool = true
     ) {
         self.init(
             detents: Detents(
@@ -81,7 +95,8 @@ struct SessionBottomSheetPolicy: Equatable {
                 peekVisibleHeight: peekVisibleHeight
             ),
             velocityThreshold: velocityThreshold,
-            retentionBand: retentionBand
+            retentionBand: retentionBand,
+            isContentFadeEnabled: isContentFadeEnabled
         )
     }
 
@@ -183,6 +198,42 @@ struct SessionBottomSheetPolicy: Equatable {
     ) -> CGFloat {
         let hiddenOffset = offset(for: .hidden, availableHeight: availableHeight)
         return min(max(proposedOffset, Self.expandedOffset), hiddenOffset)
+    }
+
+    /// drag progress가 Peek→Expanded 구간에 있을 때 두 content의 alpha를 정합니다.
+    func contentAlpha(
+        offset: CGFloat,
+        availableHeight: CGFloat
+    ) -> ContentAlpha {
+        let endVisibleHeight = visibleHeight(
+            forEndOffset: offset,
+            availableHeight: availableHeight
+        )
+        let peekHeight = visibleHeight(for: .peek, availableHeight: availableHeight)
+        let expandedHeight = visibleHeight(for: .expanded, availableHeight: availableHeight)
+
+        guard isContentFadeEnabled else {
+            if endVisibleHeight >= expandedHeight {
+                return ContentAlpha(peek: 0, expanded: 1)
+            }
+
+            if endVisibleHeight >= peekHeight {
+                return ContentAlpha(peek: 1, expanded: 0)
+            }
+
+            return ContentAlpha(peek: 0, expanded: 0)
+        }
+
+        guard endVisibleHeight >= peekHeight else {
+            return ContentAlpha(peek: 0, expanded: 0)
+        }
+
+        let travelDistance = max(1, expandedHeight - peekHeight)
+        let expandedProgress = min(max((endVisibleHeight - peekHeight) / travelDistance, 0), 1)
+        return ContentAlpha(
+            peek: 1 - expandedProgress,
+            expanded: expandedProgress
+        )
     }
 
     private enum DragDirection {

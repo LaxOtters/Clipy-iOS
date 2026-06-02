@@ -181,6 +181,13 @@ final class SessionBottomSheetView: UIView {
         let adjustedOffset = policy.adjustedOffset(offset, availableHeight: bounds.height)
         currentOffset = adjustedOffset
 
+        let contentAlpha = policy.contentAlpha(
+            offset: adjustedOffset,
+            availableHeight: bounds.height
+        )
+        peekContentStackView.alpha = contentAlpha.peek
+        expandedContentStackView.alpha = contentAlpha.expanded
+
         let updates = {
             self.transform = CGAffineTransform(translationX: 0, y: adjustedOffset)
         }
@@ -203,7 +210,16 @@ final class SessionBottomSheetView: UIView {
 // MARK: - Interface
 
 extension SessionBottomSheetView {
-    /// ViewModel state를 sheet snap 위치로 렌더링합니다.
+    /// drag progress에 따른 Peek/Expanded content cross-fade를 켜거나 끕니다.
+    var isContentFadeEnabled: Bool {
+        get { policy.isContentFadeEnabled }
+        set {
+            policy.isContentFadeEnabled = newValue
+            render(state: renderedState, animated: false)
+        }
+    }
+
+    /// ViewModel state를 sheet snap 위치와 content alpha로 렌더링합니다.
     func render(state: SessionBottomSheetState, animated: Bool) {
         renderedState = state
         setOffset(policy.offset(for: state, availableHeight: bounds.height), animated: animated)
