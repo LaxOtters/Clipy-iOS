@@ -88,7 +88,7 @@ final class SessionViewController: UIViewController {
             }
             .disposed(by: disposeBag)
 
-        bottomSheetOutput.state
+        bottomSheetOutput.renderState
             .drive(with: self) { owner, state in
                 owner.rootView.render(bottomSheetState: state, animated: true)
             }
