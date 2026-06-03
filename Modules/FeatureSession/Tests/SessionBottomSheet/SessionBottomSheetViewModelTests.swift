@@ -5,6 +5,7 @@
 //  Created by 박민서 on 5/31/26.
 //
 
+import CoreGraphics
 import XCTest
 
 import RxCocoa
@@ -13,7 +14,6 @@ import RxSwift
 
 @testable import FeatureSession
 
-/// Bottom Sheet state가 전용 ViewModel output으로 관리되는지 확인합니다.
 final class SessionBottomSheetViewModelTests: XCTestCase {
     private var disposeBag: DisposeBag!
 
@@ -31,42 +31,28 @@ final class SessionBottomSheetViewModelTests: XCTestCase {
         let output = makeOutput()
         var states: [SessionBottomSheetState] = []
 
-        output.state
+        output.renderState
             .drive(onNext: { states.append($0) })
             .disposed(by: disposeBag)
 
         XCTAssertEqual(states, [.peek])
     }
 
-    func test_dragEnded_emitsNextState_forGrabberDrivenSheetControl() {
+    func test_sameTargetState_emitsAgain_forSnapBackToDetent() {
         let dragEndedRelay = PublishRelay<SessionBottomSheetAction>()
         let output = makeOutput(dragEnded: dragEndedRelay.asSignal())
         var states: [SessionBottomSheetState] = []
 
-        output.state
+        output.renderState
             .drive(onNext: { states.append($0) })
             .disposed(by: disposeBag)
 
-        dragEndedRelay.accept(.dragEnded(translationY: -72, velocityY: 0))
+        dragEndedRelay.accept(dragEnded(endVisibleHeight: 300, translationY: -14))
 
-        XCTAssertEqual(states, [.peek, .expanded])
+        XCTAssertEqual(states, [.peek, .peek])
     }
 
-    func test_stateRequest_overridesCurrentState_forInternalOrExternalSheetAction() {
-        let stateRequestRelay = PublishRelay<SessionBottomSheetState>()
-        let output = makeOutput(stateRequest: stateRequestRelay.asSignal())
-        var states: [SessionBottomSheetState] = []
-
-        output.state
-            .drive(onNext: { states.append($0) })
-            .disposed(by: disposeBag)
-
-        stateRequestRelay.accept(.hidden)
-
-        XCTAssertEqual(states, [.peek, .hidden])
-    }
-
-    func test_stateRequestAfterDrag_overridesDragResult_forPriorityPolicy() {
+    func test_stateRequestAfterDrag_emitsRequestedState_forExplicitSheetControl() {
         let dragEndedRelay = PublishRelay<SessionBottomSheetAction>()
         let stateRequestRelay = PublishRelay<SessionBottomSheetState>()
         let output = makeOutput(
@@ -75,14 +61,14 @@ final class SessionBottomSheetViewModelTests: XCTestCase {
         )
         var states: [SessionBottomSheetState] = []
 
-        output.state
+        output.renderState
             .drive(onNext: { states.append($0) })
             .disposed(by: disposeBag)
 
-        dragEndedRelay.accept(.dragEnded(translationY: 72, velocityY: 0))
+        dragEndedRelay.accept(dragEnded(endVisibleHeight: 240, translationY: 46))
         stateRequestRelay.accept(.expanded)
 
-        XCTAssertEqual(states, [.peek, .hidden, .expanded])
+        XCTAssertEqual(states, [.peek, .minimized, .expanded])
     }
 
     func test_dragAfterStateRequest_usesRequestedState_asCurrentSheetState() {
@@ -94,14 +80,14 @@ final class SessionBottomSheetViewModelTests: XCTestCase {
         )
         var states: [SessionBottomSheetState] = []
 
-        output.state
+        output.renderState
             .drive(onNext: { states.append($0) })
             .disposed(by: disposeBag)
 
         stateRequestRelay.accept(.minimized)
-        dragEndedRelay.accept(.dragEnded(translationY: -72, velocityY: 0))
+        dragEndedRelay.accept(dragEnded(endVisibleHeight: 170, translationY: -50))
 
-        XCTAssertEqual(states, [.peek, .minimized, .hidden])
+        XCTAssertEqual(states, [.peek, .minimized, .peek])
     }
 
     private func makeOutput(
@@ -114,6 +100,22 @@ final class SessionBottomSheetViewModelTests: XCTestCase {
             input: SessionBottomSheetViewModel.Input(
                 dragEnded: dragEnded,
                 stateRequest: stateRequest
+            )
+        )
+    }
+
+    private func dragEnded(
+        endVisibleHeight: CGFloat,
+        translationY: CGFloat,
+        velocityY: CGFloat = 0,
+        availableHeight: CGFloat = 760
+    ) -> SessionBottomSheetAction {
+        .dragEnded(
+            SessionBottomSheetDragEndContext(
+                translationY: translationY,
+                velocityY: velocityY,
+                endOffset: availableHeight - endVisibleHeight,
+                availableHeight: availableHeight
             )
         )
     }
