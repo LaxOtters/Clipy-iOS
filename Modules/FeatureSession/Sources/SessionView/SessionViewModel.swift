@@ -16,7 +16,6 @@ enum SessionRoute: Equatable {
 
 /// Session 진입 입력을 WebView load command와 화면 route로 바꿉니다.
 final class SessionViewModel {
-    /// Session 화면에서 ViewModel로 들어오는 사용자 event입니다.
     struct Input {
         /// 화면 최초 진입 시 초기 URL load를 시작하는 lifecycle event입니다.
         let viewDidLoad: Signal<Void>
@@ -24,7 +23,6 @@ final class SessionViewModel {
         let homeTap: Signal<Void>
     }
 
-    /// Session 화면이 ViewController에 내보내는 command와 route입니다.
     struct Output {
         /// Browser가 처음 load해야 하는 URL command입니다.
         let initialLoadURL: Signal<URL>
@@ -32,14 +30,12 @@ final class SessionViewModel {
         let route: Signal<SessionRoute>
     }
 
-    /// Session 진입 시 이미 결정되어 있는 context 값입니다.
     private let context: SessionLaunchContext
 
     init(context: SessionLaunchContext) {
         self.context = context
     }
 
-    /// 입력 event를 초기 load command와 route event로 변환합니다.
     func transform(input: Input) -> Output {
         let initialLoadURL = input.viewDidLoad
             .compactMap { [initialURL = context.initialURL] in

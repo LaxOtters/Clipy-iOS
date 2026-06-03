@@ -10,17 +10,11 @@ import UIKit
 import RxCocoa
 import RxSwift
 
-/// Session 화면의 lifecycle, binding, Home route 처리를 맡는 UIKit shell입니다.
 final class SessionViewController: UIViewController {
-    /// Session 화면의 UIKit hierarchy를 소유하는 root view입니다.
     private let rootView = SessionView()
-    /// Session 진입 URL load와 화면 route를 만드는 화면 ViewModel입니다.
     private let viewModel: SessionViewModel
-    /// Bottom Sheet 상태를 소유하는 surface ViewModel입니다.
     private let bottomSheetViewModel: SessionBottomSheetViewModel
-    /// ViewController lifecycle 동안 유지되는 Rx binding 소유자입니다.
     private let disposeBag = DisposeBag()
-    /// Session 진입 전 navigation pop gesture 설정을 복원하기 위한 값입니다.
     private var previousPopGestureEnabled: Bool?
 
     init(
@@ -50,6 +44,7 @@ final class SessionViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationItem.hidesBackButton = true
         previousPopGestureEnabled = navigationController?.interactivePopGestureRecognizer?.isEnabled
+        // Session은 자체 Home route로 나가므로 기본 pop gesture를 막고 나갈 때 원래 값으로 돌립니다.
         navigationController?.interactivePopGestureRecognizer?.isEnabled = false
     }
 
@@ -60,7 +55,6 @@ final class SessionViewController: UIViewController {
         super.viewWillDisappear(animated)
     }
 
-    /// RootView event를 ViewModel input으로 넘기고 output을 화면에 반영합니다.
     private func bindViewModel() {
         let output = viewModel.transform(
             input: SessionViewModel.Input(
@@ -95,7 +89,6 @@ final class SessionViewController: UIViewController {
             .disposed(by: disposeBag)
     }
 
-    /// Session ViewModel이 내보낸 화면 이동 의도를 UIKit navigation으로 처리합니다.
     private func handle(route: SessionRoute) {
         switch route {
         case .home:

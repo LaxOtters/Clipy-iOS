@@ -13,15 +13,10 @@ import RxSwift
 
 /// Session 화면의 header와 browser 영역을 배치하는 root view입니다.
 final class SessionView: UIView {
-    /// Session을 닫고 Home으로 돌아가는 header button입니다.
     fileprivate let homeButton = UIButton(type: .system)
-    /// Session 안에서 웹페이지를 표시하는 WebView wrapper입니다.
     private let browserView = SessionWebView()
-    /// Browser 위에 겹쳐지는 Bottom Sheet primitive입니다.
     fileprivate let bottomSheetView = SessionBottomSheetView()
-    /// Home button과 session title을 담는 상단 영역입니다.
     private let headerView = UIView()
-    /// 현재 Session 이름을 표시할 placeholder title입니다.
     private let titleLabel = UILabel()
 
     override init(frame: CGRect) {
@@ -36,7 +31,6 @@ final class SessionView: UIView {
         nil
     }
 
-    /// Session root view의 subview hierarchy를 구성합니다.
     private func configureHierarchy() {
         addSubview(headerView)
         addSubview(browserView)
@@ -46,7 +40,6 @@ final class SessionView: UIView {
         headerView.addSubview(titleLabel)
     }
 
-    /// CLIPY-44 기준의 임시 header와 title style을 적용합니다.
     private func configureStyle() {
         backgroundColor = .systemBackground
         headerView.backgroundColor = .systemBackground
@@ -59,7 +52,6 @@ final class SessionView: UIView {
         titleLabel.textAlignment = .center
     }
 
-    /// Header, browser, Bottom Sheet가 한 화면에 겹치는 layout을 고정합니다.
     private func configureLayout() {
         headerView.translatesAutoresizingMaskIntoConstraints = false
         browserView.translatesAutoresizingMaskIntoConstraints = false
@@ -97,12 +89,12 @@ final class SessionView: UIView {
 // MARK: - Interface
 
 extension SessionView {
-    /// Browser 영역에 초기 URL load command를 전달합니다.
+    /// 초기 URL load command를 WebView wrapper로 넘깁니다.
     func load(url: URL) {
         browserView.load(url: url)
     }
 
-    /// Bottom Sheet 상태를 root view 내부 component에 렌더링합니다.
+    /// Bottom Sheet ViewModel state를 내부 sheet component에 전달합니다.
     func render(bottomSheetState: SessionBottomSheetState, animated: Bool) {
         bottomSheetView.render(state: bottomSheetState, animated: animated)
     }
@@ -111,12 +103,12 @@ extension SessionView {
 // MARK: - Reactive
 
 extension Reactive where Base: SessionView {
-    /// Home button tap을 ViewController input으로 전달합니다.
+    /// Home button tap을 화면 종료 input으로 엽니다.
     var homeTap: ControlEvent<Void> {
         base.homeButton.rx.tap
     }
 
-    /// Bottom Sheet grabber drag 종료 action을 ViewController input으로 전달합니다.
+    /// Bottom Sheet grabber drag 종료 action을 ViewModel input으로 엽니다.
     var bottomSheetDragEnded: Signal<SessionBottomSheetAction> {
         base.bottomSheetView.rx.dragEnded
     }
