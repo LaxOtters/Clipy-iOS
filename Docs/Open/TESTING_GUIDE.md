@@ -77,6 +77,11 @@ coverage 숫자를 올리기 위한 테스트보다, 이 규칙을 설명하는 
 UIKit View와 ViewController를 unit test로 과하게 묶지 않습니다.
 화면 확인은 상황에 따라 manual check, snapshot, UI test 중 가벼운 방법을 고릅니다.
 
+화면 테스트를 고를 때도 기준은 같습니다.
+먼저 제품 규칙이 어디에 있는지 봅니다.
+보임, 숨김, 전이, 입력 가능 여부처럼 화면에서 드러나는 규칙이라도, 그 판단이 Policy나 ViewModel state로 표현된다면 그쪽을 테스트합니다.
+UIKit subview가 실제로 붙어 있는지까지 unit test로 고정하지 않습니다.
+
 복잡한 로직이 UIKit, persistence, network와 한곳에 섞이면 테스트가 비싸집니다.
 이때는 mock을 늘리기보다 제품 규칙을 먼저 분리합니다.
 
@@ -90,11 +95,23 @@ ViewController는 navigation, binding, rendering에 집중합니다.
 ViewController는 ViewModel state를 렌더링합니다.
 WebView, Bottom Sheet, navigation은 직접 unit test하기보다 그 상태를 결정하는 policy를 테스트합니다.
 
+화면 테스트는 아래 순서로 판단합니다.
+
+| 질문 | 테스트 방향 |
+| --- | --- |
+| 화면 상태가 제품 규칙인가? | Policy나 ViewModel state test로 먼저 증명합니다. |
+| UIKit view가 단순히 그 state를 그리는가? | unit test로 view hierarchy를 고정하지 않습니다. |
+| 실제 화면이 깨졌는지 눈으로 확인해야 하는가? | manual check나 PR screenshot으로 확인합니다. |
+| 시각 차이가 제품 contract에 가까운가? | 대표 상태만 snapshot 후보로 봅니다. |
+| 여러 화면을 지나야만 깨지는 흐름인가? | 최소 UI test 후보로 봅니다. |
+
 아래 방향은 피합니다.
 
 - button tap 뒤 private method가 호출됐는지 확인합니다.
 - layout constraint 값을 unit test에서 촘촘히 검증합니다.
 - ViewController 내부 collaborator를 모두 mock으로 바꿔 호출 순서를 검증합니다.
+- placeholder label이나 임시 subview가 존재하는지만 확인합니다.
+- 보임/숨김 규칙을 state가 아니라 subview hierarchy로만 검증합니다.
 
 ## 테스트 스타일 우선순위
 
@@ -334,6 +351,11 @@ access level을 올리기보다 `Policy`, `Mapper`, `StateMachine` 같은 타입
 4. 중복과 임시 fixture를 줄입니다.
 5. 마지막에 테스트 이름과 구조가 문서처럼 읽히는지 봅니다.
 
+TDD 중에는 임시 테스트를 더 많이 둘 수 있습니다.
+다만 PR에 남기는 테스트는 한 번 더 걸러냅니다.
+임시 테스트가 구현을 찾는 데만 필요했다면 삭제합니다.
+제품 규칙을 설명하고 다음 변경에서 regression을 막는다면 남깁니다.
+
 ## 삭제 기준
 
 아래 질문에 “아니오”라면 지우거나 더 의미 있는 테스트로 합칩니다.
@@ -346,6 +368,17 @@ access level을 올리기보다 `Policy`, `Mapper`, `StateMachine` 같은 타입
 - 실패했을 때 고쳐야 할 production behavior가 분명한가요?
 - mock setup보다 제품 규칙이 더 잘 보이나요?
 - UIKit이나 persistence 구현 detail이 아니라 사용자 관점의 결과를 검증하나요?
+- 화면 test라면 UIKit view 존재가 아니라 상태 규칙이나 사용자 흐름을 설명하나요?
+
+아래 테스트는 PR에 남기기 전에 다시 봅니다.
+
+| 테스트 형태 | 기본 판단 |
+| --- | --- |
+| placeholder view 존재 확인 | 삭제 후보입니다. screenshot 보조 표현이면 테스트하지 않습니다. |
+| constraint 상수 비교 | 삭제 후보입니다. 제품 규칙으로 승격된 수치인지 먼저 봅니다. |
+| `isHidden` 값만 확인 | state rule로 검증할 수 있으면 view test로 남기지 않습니다. |
+| Policy와 ViewModel에서 같은 규칙 반복 검증 | 둘 다 필요한지 봅니다. ViewModel은 input/output 연결 의미가 있을 때만 남깁니다. |
+| manual check로 충분한 화면 조립 | unit test보다 PR screenshot이나 simulator 확인이 낫습니다. |
 
 ## 마무리 체크
 
@@ -358,4 +391,6 @@ access level을 올리기보다 `Policy`, `Mapper`, `StateMachine` 같은 타입
 - [ ] mock은 system edge 중심으로만 남겼습니다.
 - [ ] 시간, UUID, random 값은 고정하거나 명시적으로 주입했습니다.
 - [ ] UIKit 화면 코드는 unit test보다 더 가벼운 확인 방법이 맞는지 봤습니다.
+- [ ] placeholder, subview hierarchy, constraint 같은 UI 존재 테스트를 PR에 남길 이유가 분명합니다.
+- [ ] TDD 중 임시 테스트와 오래 남길 regression 테스트를 구분했습니다.
 - [ ] 주석은 제품 이유를 설명할 때만 남겼습니다.

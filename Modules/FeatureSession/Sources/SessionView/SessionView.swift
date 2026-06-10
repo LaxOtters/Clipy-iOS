@@ -15,6 +15,7 @@ import RxSwift
 final class SessionView: UIView {
     fileprivate let homeButton = UIButton(type: .system)
     private let browserView = SessionWebView()
+    fileprivate let bottomSheetView = SessionBottomSheetView()
     private let headerView = UIView()
     private let titleLabel = UILabel()
 
@@ -33,6 +34,7 @@ final class SessionView: UIView {
     private func configureHierarchy() {
         addSubview(headerView)
         addSubview(browserView)
+        addSubview(bottomSheetView)
 
         headerView.addSubview(homeButton)
         headerView.addSubview(titleLabel)
@@ -53,6 +55,7 @@ final class SessionView: UIView {
     private func configureLayout() {
         headerView.translatesAutoresizingMaskIntoConstraints = false
         browserView.translatesAutoresizingMaskIntoConstraints = false
+        bottomSheetView.translatesAutoresizingMaskIntoConstraints = false
         homeButton.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -66,6 +69,11 @@ final class SessionView: UIView {
             browserView.leadingAnchor.constraint(equalTo: leadingAnchor),
             browserView.trailingAnchor.constraint(equalTo: trailingAnchor),
             browserView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            bottomSheetView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            bottomSheetView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            bottomSheetView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bottomSheetView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             homeButton.leadingAnchor.constraint(equalTo: headerView.layoutMarginsGuide.leadingAnchor),
             homeButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
@@ -81,15 +89,27 @@ final class SessionView: UIView {
 // MARK: - Interface
 
 extension SessionView {
+    /// 초기 URL load command를 WebView wrapper로 넘깁니다.
     func load(url: URL) {
         browserView.load(url: url)
+    }
+
+    /// Bottom Sheet ViewModel state를 내부 sheet component에 전달합니다.
+    func render(bottomSheetState: SessionBottomSheetState, animated: Bool) {
+        bottomSheetView.render(state: bottomSheetState, animated: animated)
     }
 }
 
 // MARK: - Reactive
 
 extension Reactive where Base: SessionView {
+    /// Home button tap을 화면 종료 input으로 엽니다.
     var homeTap: ControlEvent<Void> {
         base.homeButton.rx.tap
+    }
+
+    /// Bottom Sheet grabber drag 종료 action을 ViewModel input으로 엽니다.
+    var bottomSheetDragEnded: Signal<SessionBottomSheetAction> {
+        base.bottomSheetView.rx.dragEnded
     }
 }

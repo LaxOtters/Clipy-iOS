@@ -10,15 +10,19 @@ import UIKit
 import RxCocoa
 import RxSwift
 
-/// Session 화면의 lifecycle, binding, Home route 처리를 맡는 UIKit shell입니다.
 final class SessionViewController: UIViewController {
     private let rootView = SessionView()
     private let viewModel: SessionViewModel
+    private let bottomSheetViewModel: SessionBottomSheetViewModel
     private let disposeBag = DisposeBag()
     private var previousPopGestureEnabled: Bool?
 
-    init(viewModel: SessionViewModel) {
+    init(
+        viewModel: SessionViewModel,
+        bottomSheetViewModel: SessionBottomSheetViewModel
+    ) {
         self.viewModel = viewModel
+        self.bottomSheetViewModel = bottomSheetViewModel
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -40,6 +44,7 @@ final class SessionViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationItem.hidesBackButton = true
         previousPopGestureEnabled = navigationController?.interactivePopGestureRecognizer?.isEnabled
+        // Session은 자체 Home route로 나가므로 기본 pop gesture를 막고 나갈 때 원래 값으로 돌립니다.
         navigationController?.interactivePopGestureRecognizer?.isEnabled = false
     }
 
@@ -58,6 +63,13 @@ final class SessionViewController: UIViewController {
             )
         )
 
+        let bottomSheetOutput = bottomSheetViewModel.transform(
+            input: SessionBottomSheetViewModel.Input(
+                dragEnded: rootView.rx.bottomSheetDragEnded,
+                stateRequest: .empty()
+            )
+        )
+
         output.initialLoadURL
             .emit(with: self) { owner, url in
                 owner.rootView.load(url: url)
@@ -67,6 +79,12 @@ final class SessionViewController: UIViewController {
         output.route
             .emit(with: self) { owner, route in
                 owner.handle(route: route)
+            }
+            .disposed(by: disposeBag)
+
+        bottomSheetOutput.renderState
+            .drive(with: self) { owner, state in
+                owner.rootView.render(bottomSheetState: state, animated: true)
             }
             .disposed(by: disposeBag)
     }
