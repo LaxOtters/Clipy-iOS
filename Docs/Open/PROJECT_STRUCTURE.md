@@ -95,6 +95,33 @@ Core -x-> Feature
 Feature끼리는 직접 의존하지 않습니다.
 공유해야 하는 규칙이나 타입이 생기면 먼저 Core 책임인지 봅니다.
 
+## Tuist manifest 작성 기준
+
+module `Project.swift`는 직접 `TargetDependency`를 조립하지 않고, 역할별 helper를 통해 target을 만듭니다.
+
+| 역할 | helper |
+| --- | --- |
+| App target | `ClipyModuleFactory.makeApp` |
+| Core framework | `ClipyModuleFactory.makeCore` |
+| Feature framework | `ClipyModuleFactory.makeFeature` |
+
+의존성은 `ClipyDependencies`에 모아두고, App/Core/Feature 역할에 맞는 typed dependency로 표현합니다.
+module 이름과 bundle suffix는 module identifier에서 읽고, `Project.swift`는 어떤 module을 만들지 선언하는 쪽에 가깝게 둡니다.
+이렇게 두면 module이 늘어나도 의존 방향과 target 이름을 `Project.swift`마다 다시 해석하지 않아도 됩니다.
+
+module 하나만 확인할 때는 아래 command를 씁니다.
+
+```bash
+./scripts/validate_ios_module.sh CoreDomain
+./scripts/validate_ios_module.sh FeatureSession
+```
+
+기본은 `test` mode입니다. build만 확인하려면 기존 validation 환경변수를 그대로 씁니다.
+
+```bash
+CLIPY_IOS_VALIDATION_MODE=build-for-testing ./scripts/validate_ios_module.sh FeatureSession
+```
+
 ## DI 조립 위치
 
 DIContainer는 `AppMain`에서 시작합니다.
