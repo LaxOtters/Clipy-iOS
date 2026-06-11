@@ -8,61 +8,75 @@
 import ProjectDescription
 
 public enum ClipyModuleFactory {
+    /// App target과 test target, shared scheme을 함께 만듭니다.
     public static func makeApp(
-        name: String,
-        bundleIdSuffix: String,
-        dependencies: [TargetDependency] = [],
+        module: AppModule,
+        dependencies: [AppDependency] = [],
         hasTests: Bool = true
     ) -> Project {
         var targets: [Target] = [
             .target(
-                name: name,
+                name: module.name,
                 destinations: ClipyProjectConfig.defaultDestinations,
                 product: .app,
-                bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(bundleIdSuffix)",
+                bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(module.bundleIdSuffix)",
                 deploymentTargets: ClipyProjectConfig.deploymentTargets,
                 infoPlist: .extendingDefault(with: ClipyProjectConfig.baseInfoPlist),
                 sources: ["\(ClipyProjectConfig.sourcesDirectory)/**"],
-                dependencies: dependencies
+                dependencies: dependencies.map(\.targetDependency)
             )
         ]
 
         if hasTests {
-            targets.append(
-                .target(
-                    name: "\(name)Tests",
-                    destinations: ClipyProjectConfig.defaultDestinations,
-                    product: .unitTests,
-                    bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(bundleIdSuffix).tests",
-                    deploymentTargets: ClipyProjectConfig.deploymentTargets,
-                    infoPlist: .default,
-                    sources: ["\(ClipyProjectConfig.testsDirectory)/**"],
-                    dependencies: [.target(name: name)]
-                )
-            )
+            targets.append(makeTestTarget(for: module))
         }
 
-        return Project(
-            name: name,
-            options: .options(automaticSchemesOptions: .disabled),
-            targets: targets,
-            schemes: [makeScheme(name: name, hasTests: hasTests)]
+        return makeProject(module: module, targets: targets, hasTests: hasTests)
+    }
+
+    /// Core framework target을 만듭니다. CoreData model은 persistence module처럼 필요한 Core에서만 넘깁니다.
+    public static func makeCore(
+        module: CoreModule,
+        dependencies: [CoreDependency] = [],
+        hasTests: Bool = true,
+        coreDataModels: [CoreDataModel] = []
+    ) -> Project {
+        makeFramework(
+            module: module,
+            dependencies: dependencies.map(\.targetDependency),
+            hasTests: hasTests,
+            coreDataModels: coreDataModels
         )
     }
 
-    public static func makeFramework(
-        name: String,
-        bundleIdSuffix: String,
-        dependencies: [TargetDependency] = [],
+    /// Feature framework target을 만듭니다. Feature끼리 직접 연결하지 않는 dependency shape를 받습니다.
+    public static func makeFeature(
+        module: FeatureModule,
+        dependencies: [FeatureDependency] = [],
+        hasTests: Bool = true
+    ) -> Project {
+        makeFramework(
+            module: module,
+            dependencies: dependencies.map(\.targetDependency),
+            hasTests: hasTests
+        )
+    }
+}
+
+private extension ClipyModuleFactory {
+
+    static func makeFramework(
+        module: some ClipyModuleIdentifiable,
+        dependencies: [TargetDependency],
         hasTests: Bool = true,
         coreDataModels: [CoreDataModel] = []
     ) -> Project {
         var targets: [Target] = [
             .target(
-                name: name,
+                name: module.name,
                 destinations: ClipyProjectConfig.defaultDestinations,
                 product: .framework,
-                bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(bundleIdSuffix)",
+                bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(module.bundleIdSuffix)",
                 deploymentTargets: ClipyProjectConfig.deploymentTargets,
                 infoPlist: .default,
                 sources: ["\(ClipyProjectConfig.sourcesDirectory)/**"],
@@ -72,29 +86,39 @@ public enum ClipyModuleFactory {
         ]
 
         if hasTests {
-            targets.append(
-                .target(
-                    name: "\(name)Tests",
-                    destinations: ClipyProjectConfig.defaultDestinations,
-                    product: .unitTests,
-                    bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(bundleIdSuffix).tests",
-                    deploymentTargets: ClipyProjectConfig.deploymentTargets,
-                    infoPlist: .default,
-                    sources: ["\(ClipyProjectConfig.testsDirectory)/**"],
-                    dependencies: [.target(name: name)]
-                )
-            )
+            targets.append(makeTestTarget(for: module))
         }
 
-        return Project(
-            name: name,
+        return makeProject(module: module, targets: targets, hasTests: hasTests)
+    }
+
+    static func makeProject(
+        module: some ClipyModuleIdentifiable,
+        targets: [Target],
+        hasTests: Bool
+    ) -> Project {
+        Project(
+            name: module.name,
             options: .options(automaticSchemesOptions: .disabled),
             targets: targets,
-            schemes: [makeScheme(name: name, hasTests: hasTests)]
+            schemes: [makeScheme(name: module.name, hasTests: hasTests)]
         )
     }
 
-    private static func makeScheme(name: String, hasTests: Bool) -> Scheme {
+    static func makeTestTarget(for module: some ClipyModuleIdentifiable) -> Target {
+        .target(
+            name: "\(module.name)Tests",
+            destinations: ClipyProjectConfig.defaultDestinations,
+            product: .unitTests,
+            bundleId: "\(ClipyProjectConfig.bundleIdPrefix).\(module.bundleIdSuffix).tests",
+            deploymentTargets: ClipyProjectConfig.deploymentTargets,
+            infoPlist: .default,
+            sources: ["\(ClipyProjectConfig.testsDirectory)/**"],
+            dependencies: [.target(name: module.name)]
+        )
+    }
+
+    static func makeScheme(name: String, hasTests: Bool) -> Scheme {
         Scheme.scheme(
             name: name,
             shared: true,
