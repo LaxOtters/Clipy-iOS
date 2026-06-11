@@ -8,12 +8,9 @@
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-let project = ClipyModuleFactory.makeFramework(
-    name: "CorePersistence",
-    bundleIdSuffix: "core-persistence",
-    dependencies: [
-        .project(target: "CoreDomain", path: .relativeToRoot("Modules/CoreDomain"))
-    ],
+let project = ClipyModuleFactory.makeCore(
+    module: .corePersistence,
+    dependencies: ClipyDependencies.corePersistence,
     coreDataModels: [
         .coreDataModel("Resources/ClipyPersistence.xcdatamodeld")
     ]
