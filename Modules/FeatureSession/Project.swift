@@ -8,14 +8,8 @@
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-let project = ClipyModuleFactory.makeFramework(
-    name: "FeatureSession",
-    bundleIdSuffix: "feature-session",
-    dependencies: [
-        .external(name: "RxSwift"),
-        .external(name: "RxCocoa"),
-        .external(name: "RxRelay"),
-        .project(target: "CoreDomain", path: .relativeToRoot("Modules/CoreDomain"))
-    ],
+let project = ClipyModuleFactory.makeFeature(
+    module: .featureSession,
+    dependencies: ClipyDependencies.featureSession,
     hasTests: true
 )

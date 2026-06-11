@@ -8,7 +8,7 @@
 import ProjectDescription
 import ProjectDescriptionHelpers
 
-let project = ClipyModuleFactory.makeFramework(
-    name: "CoreDomain",
-    bundleIdSuffix: "core-domain"
+let project = ClipyModuleFactory.makeCore(
+    module: .coreDomain,
+    dependencies: ClipyDependencies.coreDomain
 )
