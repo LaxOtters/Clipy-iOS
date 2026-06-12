@@ -7,10 +7,11 @@ cd "$ROOT_DIR"
 PROFILE="${CLIPY_IOS_VALIDATION_PROFILE:-}"
 SCHEMES_RAW="${CLIPY_IOS_VALIDATION_SCHEMES:-}"
 DRY_RUN="${CLIPY_IOS_VALIDATION_DRY_RUN:-0}"
-# 기본값은 simulator를 띄우지 않는 build-for-testing입니다.
-# 실제 test가 필요한 작업만 CLIPY_IOS_VALIDATION_MODE=test를 명시합니다.
+# 기본값은 simulator를 띄우지 않는 build-for-testing입니다. test mode는 필요한 작업에서만 명시합니다.
 export CLIPY_IOS_VALIDATION_MODE="${CLIPY_IOS_VALIDATION_MODE:-build-for-testing}"
 
+# 이 script는 label resolver나 로컬 호출자가 넘긴 profile을 실제 검증 순서로 바꿉니다.
+# dry-run과 실제 실행이 같은 PLAN을 보므로 CI에서 고른 흐름을 로컬에서도 재현합니다.
 usage() {
   cat >&2 <<USAGE
 Usage: CLIPY_IOS_VALIDATION_PROFILE=<profile> $0
@@ -35,15 +36,14 @@ USAGE
 }
 
 if [[ -z "$PROFILE" ]]; then
-  # profile이 없으면 넓은 검증으로 추정하지 않습니다.
-  # 비용이 큰 검증을 실수로 돌릴 수 있어서 바로 멈춥니다.
+  # profile이 없으면 fail-fast로 멈춥니다.
+  # 여기서 넓은 검증으로 추정하면 CI 비용과 실제 검증 범위가 호출자마다 달라집니다.
   echo "CLIPY_IOS_VALIDATION_PROFILE is required." >&2
   usage
   exit 2
 fi
 
-# dry-run에서도 mode 오타는 먼저 잡습니다.
-# 잘못된 plan이 PR이나 CI 설정으로 넘어가는 걸 막기 위해서입니다.
+# dry-run이어도 mode 오타는 먼저 잡습니다. 잘못된 plan이 PR이나 CI 설정에 남으면 재현이 어렵습니다.
 case "$CLIPY_IOS_VALIDATION_MODE" in
   build-for-testing|build|test)
     ;;
@@ -62,8 +62,8 @@ PROJECT_SETUP_SCHEMES=(
   "FeatureSession"
 )
 
-# PLAN은 kind|description|command|arg1|arg2 형태로 쌓습니다.
-# dry-run에 보이는 plan과 실제 실행 plan이 갈라지지 않게 같은 배열을 씁니다.
+# PLAN 배열은 dry-run과 실제 실행이 함께 쓰는 command 목록입니다.
+# 입력을 어떻게 받았든 최종 검증 순서는 이 배열만 봅니다.
 add_script_step() {
   local description="$1"
   local entry="script|${description}"
@@ -77,8 +77,8 @@ add_script_step() {
   PLAN+=("$entry")
 }
 
-# build-script는 첫 실행 직전에 Tuist workspace를 한 번만 만듭니다.
-# 이후 child script는 같은 workspace를 써서 CI에서 generate를 반복하지 않습니다.
+# build가 처음 필요해질 때만 Tuist workspace를 만들고, 같은 profile 안에서는 재사용합니다.
+# module이 여러 개여도 install/generate를 반복하지 않게 하는 비용 절감 경계입니다.
 add_build_step() {
   local description="$1"
   local entry="build-script|${description}"
@@ -100,7 +100,7 @@ add_function_step() {
 }
 
 run_command() {
-  # CI 로그에서 실제로 돈 command를 바로 찾을 수 있게 먼저 출력합니다.
+  # CI 로그에서 실제로 실행한 command를 바로 찾을 수 있게 먼저 찍습니다.
   echo "+ $*"
   "$@"
 }
@@ -138,8 +138,7 @@ read_validation_schemes() {
 check_validation_schemes() {
   local scheme
 
-  # scheme 오타는 Tuist generate 전에 잡습니다.
-  # 실제 build 검증은 아래 plan에서 같은 validate_ios_module.sh가 다시 맡습니다.
+  # scheme 오타는 Tuist generate 전에 잡고, 실제 build는 plan step에서 다시 실행합니다.
   for scheme in "${VALIDATION_SCHEMES[@]}"; do
     "$ROOT_DIR/scripts/validate_ios_module.sh" --check "$scheme"
   done
@@ -179,8 +178,8 @@ add_project_setup_module_steps() {
 }
 
 read_changed_files() {
-  # GitHub API나 label 조회는 PR2에서 붙입니다.
-  # PR1에서는 호출자가 넘긴 changed files만 보고 docs-only 여부를 확인합니다.
+  # GitHub에서는 workflow가, 로컬에서는 사람이 changed files를 넘깁니다.
+  # 여기서는 출처를 따지지 않고 docs-only로 build를 생략해도 되는지만 검사합니다.
   if [[ -n "${CLIPY_IOS_CHANGED_FILES:-}" ]]; then
     printf '%s\n' "$CLIPY_IOS_CHANGED_FILES"
     return
@@ -216,7 +215,7 @@ validate_docs_only_changed_files() {
   local path
 
   # changed files 입력이 없으면 docs-only라고 보지 않습니다.
-  # 첫 구현에서는 자동 diff 분석 대신 명시 입력만 받습니다.
+  # build를 생략하는 profile이라서, 증거가 없을 때 안전한 쪽으로 실패시킵니다.
   changed_files="$(read_changed_files)"
 
   if [[ -z "$changed_files" ]]; then
@@ -232,8 +231,7 @@ validate_docs_only_changed_files() {
   done <<< "$changed_files"
 
   if ((${#invalid_paths[@]} > 0)); then
-    # docs-only로 돌렸지만 코드성 파일이 섞인 경우입니다.
-    # 이때는 더 넓은 profile을 골라 다시 실행합니다.
+    # docs-only로 돌렸지만 코드성 파일이 섞였으므로 더 넓은 profile로 다시 봐야 합니다.
     echo "docs-only profile received non-doc/template paths:" >&2
     printf '  %s\n' "${invalid_paths[@]}" >&2
     exit 1
@@ -246,8 +244,7 @@ validate_workflow_yaml() {
   local workflow_count=0
   local workflow
 
-  # PR1에서는 workflow를 바꾸지 않지만, ci profile을 로컬에서 확인할 수 있게 syntax만 봅니다.
-  # macOS 기본 Ruby YAML parser로 충분해서 dependency를 새로 넣지 않습니다.
+  # workflow 변경은 먼저 YAML 문법만 봅니다. macOS 기본 Ruby parser로 충분해서 dependency를 늘리지 않습니다.
   while IFS= read -r workflow; do
     workflow_count=$((workflow_count + 1))
     ruby --disable-gems -e 'require "yaml"; YAML.load_file(ARGV[0])' "$workflow"
@@ -262,49 +259,50 @@ validate_workflow_yaml() {
 }
 
 prepare_tuist_workspace() {
-  # GitHub fresh runner에는 생성물이 없으므로 build profile에서는 install/generate를 먼저 돌립니다.
-  # 재사용 신호는 이 함수가 성공한 뒤 child process에만 넘깁니다.
+  # GitHub runner에는 생성물이 없으므로 build profile에서는 install/generate를 먼저 돌립니다.
+  # 재사용 flag는 이 함수가 성공한 뒤 같은 profile의 하위 script에만 넘깁니다.
+  # 로컬에서 오래된 workspace를 재사용하는 용도로 쓰지 않습니다.
   echo "Preparing Tuist workspace..."
   mise exec -- tuist install
   mise exec -- tuist generate
 }
 
 plan_for_profile() {
-  # profile은 검증 방식과 비용을 정하고, scheme 입력은 검증 대상을 정합니다.
-  # 새 module을 추가하면 validate_ios_module.sh whitelist와 필요한 docs를 같이 바꿉니다.
+  # profile은 검증 비용과 조합을 정하고, scheme 입력은 실제 대상을 정합니다.
+  # 새 module은 허용 scheme 목록과 label resolver까지 맞춘 뒤 profile에 넣습니다.
   case "$PROFILE" in
     project-setup)
-      # Tuist helper나 manifest 규칙을 건드렸을 때 쓰는 넓은 profile입니다.
-      # 전체 앱 test 대신 AppMain과 현재 공개된 module scheme이 build되는지만 봅니다.
+      # Tuist helper나 manifest 규칙을 건드렸을 때는 module build까지 넓게 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       add_project_setup_module_steps
       ;;
     ci)
-      # GitHub label mapping을 붙이기 전까지는 로컬에서 직접 호출하는 CI 성격의 profile입니다.
+      # GitHub Actions나 validation script 변경은 YAML과 AppMain 조립을 같이 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
       add_function_step "GitHub workflow YAML syntax" validate_workflow_yaml
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       ;;
     app-main)
-      # 앱 진입점이나 공통 wiring만 바뀐 경우 AppMain scheme만 확인합니다.
+      # 앱 진입점이나 공통 wiring만 바뀐 경우 AppMain scheme만 봅니다.
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       ;;
     tuist-foundation)
-      # Tuist manifest 규칙과 generated artifact만 빠르게 보고 싶을 때 씁니다.
+      # Tuist manifest 규칙과 git에 이미 올라간 생성물만 빠르게 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
       ;;
     module)
-      # 지정한 module scheme만 확인합니다. AppMain 조립까지 볼 필요가 없을 때 씁니다.
+      # 지정한 module scheme만 봅니다. AppMain 조립까지 필요하면 integration을 씁니다.
       add_module_steps
       ;;
     integration)
-      # 지정한 module scheme과 AppMain 조립을 같이 봅니다.
+      # module 변경이 앱 조립에서 깨지는지 같이 봅니다.
       add_module_steps
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       ;;
     docs-only)
-      # docs-only는 build를 생략하는 대신 changed files로 코드 변경이 섞였는지 확인합니다.
+      # docs-only는 build를 생략하므로 changed files가 public docs/template 범위인지 먼저 봅니다.
+      # 코드성 파일이 하나라도 섞이면 이 profile을 쓰지 않습니다.
       add_function_step "Docs-only changed files check" validate_docs_only_changed_files
       add_script_step "Tracked generated artifact preflight" "$ROOT_DIR/scripts/validate_tuist_foundation.sh" "--generated-artifacts-only"
       ;;
@@ -324,8 +322,7 @@ print_plan() {
   local index
   local kind
 
-  # dry-run도 실제 실행과 같은 PLAN을 봅니다.
-  # 그래서 build 없이도 어떤 검증이 돌지 먼저 리뷰할 수 있습니다.
+  # dry-run도 같은 PLAN을 보므로 build 없이 실제 검증 순서를 확인할 수 있습니다.
   echo "Validation profile: ${PROFILE}"
   echo "Validation mode: ${CLIPY_IOS_VALIDATION_MODE}"
   if plan_has_build_step; then
@@ -347,8 +344,8 @@ plan_has_build_step() {
   local index
   local kind
 
-  # build step이 하나라도 있으면 Tuist install/generate가 필요합니다.
-  # docs-only처럼 function/script step만 있으면 workspace를 만들지 않습니다.
+  # build step이 없으면 workspace를 만들지 않습니다.
+  # docs-only처럼 build를 생략하는 profile에서 Tuist 비용을 쓰지 않기 위해서입니다.
   for index in "${!PLAN[@]}"; do
     IFS='|' read -r kind _ <<< "${PLAN[$index]}"
     if [[ "$kind" == "build-script" ]]; then
@@ -368,18 +365,18 @@ execute_plan() {
   local command
   local tuist_prepared="0"
 
-  # PLAN 순서대로 실행하되, 첫 build-script 직전에만 Tuist workspace를 만듭니다.
-  # static policy가 실패하면 generate 비용을 쓰기 전에 멈춥니다.
+  # 정적 정책 검사가 실패하면 generate 비용을 쓰기 전에 멈춥니다.
+  # 첫 build-script 직전에만 workspace를 만들고 이후 build step은 같은 profile 안에서 재사용합니다.
   for index in "${!PLAN[@]}"; do
     IFS='|' read -r kind description command arg1 arg2 <<< "${PLAN[$index]}"
     echo "==> ${description}"
     if [[ "$kind" == "function" ]]; then
-      # function step은 현재 shell 함수로 실행합니다. docs-only나 yaml syntax처럼 별도 script가 필요 없는 검증입니다.
+      # function step은 docs-only나 YAML syntax처럼 별도 script가 필요 없는 검사만 둡니다.
       "$command"
     else
       if [[ "$kind" == "build-script" && "$tuist_prepared" != "1" ]]; then
         prepare_tuist_workspace
-        # 이 flag는 방금 만든 workspace를 하위 검증에서만 다시 쓰게 하는 내부 신호입니다.
+        # 방금 만든 workspace를 같은 profile 안에서만 재사용하게 하는 내부 신호입니다.
         export CLIPY_IOS_SKIP_TUIST_PREP=1
         tuist_prepared="1"
       fi
