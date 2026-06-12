@@ -116,10 +116,32 @@ module 하나만 확인할 때는 아래 command를 씁니다.
 ./scripts/validate_ios_module.sh FeatureSession
 ```
 
-기본은 `test` mode입니다. build만 확인하려면 기존 validation 환경변수를 그대로 씁니다.
+기본은 `build-for-testing` mode입니다.
+simulator에서 test까지 실행해야 할 때만 `CLIPY_IOS_VALIDATION_MODE=test`를 명시합니다.
 
 ```bash
 CLIPY_IOS_VALIDATION_MODE=build-for-testing ./scripts/validate_ios_module.sh FeatureSession
+```
+
+Tuist manifest 규칙만 빠르게 확인할 때는 아래 command를 씁니다.
+
+```bash
+./scripts/validate_tuist_foundation.sh
+```
+
+이 검증은 module `Project.swift`에서 raw `.project`, `.external`, `TargetDependency` 조립, generic factory 직접 호출이 helper 밖으로 새지 않았는지 확인합니다.
+생성된 `.xcodeproj`, `.xcworkspace`, `Derived/`가 tracked file로 들어오는지도 함께 막습니다.
+tracked file 기준 검증이라서, PR 전에는 `git status --short`로 untracked 생성물도 따로 확인합니다.
+
+작업 범위에 맞는 검증 묶음은 profile router로 실행합니다.
+profile은 검증 방식과 비용을 정하고, module 대상은 scheme 입력으로 분리합니다.
+
+```bash
+CLIPY_IOS_VALIDATION_PROFILE=project-setup ./scripts/validate_ios_profile.sh
+
+CLIPY_IOS_VALIDATION_PROFILE=integration \
+CLIPY_IOS_VALIDATION_SCHEMES=FeatureSession \
+./scripts/validate_ios_profile.sh
 ```
 
 ## DI 조립 위치
