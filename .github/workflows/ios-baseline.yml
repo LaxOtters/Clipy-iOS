@@ -2,6 +2,13 @@ name: iOS Baseline
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - labeled
+      - unlabeled
     paths:
       - ".github/workflows/ios-baseline.yml"
       - ".mise.toml"
@@ -9,8 +16,48 @@ on:
       - "Workspace.swift"
       - "Tuist/**"
       - "Modules/**"
-      - "scripts/validate_ios_baseline.sh"
+      - "scripts/validate_ios_*.sh"
+      - "scripts/validate_tuist_foundation.sh"
+      - "scripts/resolve_ios_validation_from_labels.sh"
+      - "Docs/Open/**"
+      - "Docs/README.md"
+      - "README.md"
+      - "AGENTS.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE/**"
+      - ".github/pull_request_template.md"
   workflow_dispatch:
+    inputs:
+      validation_profile:
+        description: "Validation profile to run"
+        required: true
+        type: choice
+        default: project-setup
+        options:
+          - docs-only
+          - tuist-foundation
+          - app-main
+          - module
+          - integration
+          - project-setup
+          - ci
+      validation_schemes:
+        description: "Optional schemes for module/integration profiles"
+        required: false
+        type: string
+      changed_files:
+        description: "Optional newline-separated changed files for docs-only"
+        required: false
+        type: string
+      validation_mode:
+        description: "xcodebuild validation mode"
+        required: true
+        type: choice
+        default: build-for-testing
+        options:
+          - build-for-testing
+          - build
+          - test
 
 permissions:
   contents: read
@@ -27,6 +74,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect changed files
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          CHANGED_FILES_PATH: /tmp/clipy_changed_files
+        run: |
+          git fetch origin "$BASE_REF" --depth=1
+          git diff --name-only "origin/${BASE_REF}...HEAD" > "$CHANGED_FILES_PATH"
+          echo "CLIPY_IOS_CHANGED_FILES_FILE=$CHANGED_FILES_PATH" >> "$GITHUB_ENV"
+          echo "Changed files:"
+          cat "$CHANGED_FILES_PATH"
+
+      - name: Resolve validation profile from PR labels
+        if: ${{ github.event_name == 'pull_request' }}
+        run: ./scripts/resolve_ios_validation_from_labels.sh >> "$GITHUB_ENV"
+
+      - name: Configure manual validation profile
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          INPUT_PROFILE: ${{ inputs.validation_profile }}
+          INPUT_SCHEMES: ${{ inputs.validation_schemes }}
+          INPUT_CHANGED_FILES: ${{ inputs.changed_files }}
+          INPUT_MODE: ${{ inputs.validation_mode }}
+          MANUAL_CHANGED_FILES_PATH: /tmp/clipy_manual_changed_files
+        run: |
+          case "$INPUT_SCHEMES" in
+            *$'\n'*|*$'\r'*)
+              echo "validation_schemes must be a single line." >&2
+              exit 2
+              ;;
+          esac
+
+          case "$INPUT_SCHEMES" in
+            *[!A-Za-z0-9_,\ -]*)
+              echo "validation_schemes contains unsupported characters." >&2
+              exit 2
+              ;;
+          esac
+
+          printf '%s\n' "$INPUT_CHANGED_FILES" > "$MANUAL_CHANGED_FILES_PATH"
+
+          printf 'CLIPY_IOS_VALIDATION_PROFILE=%s\n' "$INPUT_PROFILE" >> "$GITHUB_ENV"
+          printf 'CLIPY_IOS_VALIDATION_SCHEMES=%s\n' "$INPUT_SCHEMES" >> "$GITHUB_ENV"
+          printf 'CLIPY_IOS_CHANGED_FILES_FILE=%s\n' "$MANUAL_CHANGED_FILES_PATH" >> "$GITHUB_ENV"
+          printf 'CLIPY_IOS_VALIDATION_MODE=%s\n' "$INPUT_MODE" >> "$GITHUB_ENV"
 
       - name: Install mise
         run: |
@@ -49,5 +144,9 @@ jobs:
           restore-keys: |
             tuist-dependencies-${{ runner.os }}-
 
-      - name: Validate iOS baseline
-        run: ./scripts/validate_ios_baseline.sh
+      - name: Show iOS validation plan
+        run: |
+          CLIPY_IOS_VALIDATION_DRY_RUN=1 ./scripts/validate_ios_profile.sh
+
+      - name: Validate iOS profile
+        run: ./scripts/validate_ios_profile.sh
