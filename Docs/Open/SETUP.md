@@ -55,7 +55,7 @@ CLIPY_IOS_VALIDATION_SCHEMES=FeatureSession \
 
 | Profile | 주로 쓰는 경우 |
 | --- | --- |
-| `docs-only` | 문서와 GitHub template만 변경 |
+| `docs-only` | 공개 문서와 GitHub template만 변경 |
 | `tuist-foundation` | Tuist manifest 규칙과 generated artifact 확인 |
 | `app-main` | AppMain 조립이나 app entry 변경 |
 | `module` | 지정한 module scheme만 확인 |
@@ -87,7 +87,7 @@ CLIPY_IOS_CHANGED_FILES=$'Docs/Open/SETUP.md\nDocs/Open/PROJECT_STRUCTURE.md' \
   ./scripts/validate_ios_profile.sh
 ```
 
-`docs-only`는 iOS build를 생략하는 대신, 입력된 파일이 문서나 GitHub template 계열인지 확인합니다.
+`docs-only`는 iOS build를 생략하는 대신, 입력된 파일이 `Docs/Open`, root 문서, GitHub template 계열인지 확인합니다.
 generated artifact 확인은 tracked file 기준의 preflight입니다.
 PR을 올리기 전에는 `git status --short`로 untracked 생성물이 섞였는지도 따로 봅니다.
 
@@ -106,10 +106,42 @@ xcodebuild test \
 
 ## CI
 
-GitHub Actions에서는 `iOS Baseline` workflow가 같은 baseline script를 실행합니다.
-CI도 Tuist manifest를 기준으로 project를 생성합니다.
-현재 기본 CI는 `AppMain` build-for-testing까지 확인합니다.
-simulator를 띄우는 full test는 필요한 PR에서 `CLIPY_IOS_VALIDATION_MODE=test`로 별도 확인합니다.
+GitHub Actions에서는 `iOS Baseline` workflow가 PR label을 보고 validation profile을 고릅니다.
+workflow가 label과 changed files를 준비하고, 실제 검증은 local과 같은 `./scripts/validate_ios_profile.sh`가 실행합니다.
+CI도 기본 mode는 `build-for-testing`입니다.
+simulator를 띄우는 full test는 필요한 PR에서 별도로 확인합니다.
+
+| PR label | CI profile | Scheme |
+| --- | --- | --- |
+| `TYPE \| Docs` + `AREA \| Docs` | `docs-only` | 없음 |
+| `AREA \| Project Setup` | `project-setup` | router 내부 기준 |
+| `AREA \| CI` | `ci` | 없음 |
+| `AREA \| AppMain` | `app-main` | 없음 |
+| `AREA \| CoreDomain` | `integration` | `CoreDomain` |
+| `AREA \| CorePersistence` | `integration` | `CorePersistence` |
+| `AREA \| FeatureSession` | `integration` | `FeatureSession` |
+
+module 영역은 CI에서 `module`이 아니라 `integration`으로 확인합니다.
+해당 module만 build되는지보다 AppMain 조립까지 같이 보는 편이 안전하기 때문입니다.
+label이 없거나 지원하지 않는 조합이면 CI는 추정하지 않고 실패합니다.
+`AREA | CI`가 다른 AREA와 같이 있으면 `ci` profile을 우선합니다.
+manual dispatch에서 `docs-only`를 고를 때는 changed files 입력도 같이 넘겨야 합니다.
+
+label mapping만 로컬에서 확인할 수도 있습니다.
+
+```sh
+CLIPY_IOS_PR_LABELS=$'TYPE | Refactor\nAREA | FeatureSession' \
+  ./scripts/resolve_ios_validation_from_labels.sh
+```
+
+위 결과를 profile router dry-run에 넘기면 실제 CI가 어떤 검증을 고르는지 build 없이 확인할 수 있습니다.
+
+```sh
+CLIPY_IOS_VALIDATION_PROFILE=integration \
+CLIPY_IOS_VALIDATION_SCHEMES=FeatureSession \
+CLIPY_IOS_VALIDATION_DRY_RUN=1 \
+  ./scripts/validate_ios_profile.sh
+```
 
 ## Generated files
 
