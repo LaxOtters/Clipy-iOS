@@ -70,6 +70,11 @@ extension SessionView {
         browserView.load(url: url)
     }
 
+    /// 새 Session의 첫 화면에서 Top Bar가 어떤 모습으로 시작할지 반영합니다.
+    func render(chromeState: SessionInitialChromeState) {
+        topBarView.render(state: chromeState.topBarState)
+    }
+
     /// Bottom Sheet ViewModel state를 내부 sheet component에 전달합니다.
     func render(bottomSheetState: SessionBottomSheetState, animated: Bool) {
         bottomSheetView.render(state: bottomSheetState, animated: animated)

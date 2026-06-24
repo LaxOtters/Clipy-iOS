@@ -62,6 +62,20 @@ final class SessionViewModelTests: XCTestCase {
         XCTAssertTrue(loadedURLs.isEmpty)
     }
 
+    func test_viewDidLoad_emitsUnfoldedTopBarState_forNewSessionEntry() {
+        let viewDidLoadRelay = PublishRelay<Void>()
+        let output = makeOutput(viewDidLoad: viewDidLoadRelay.asSignal())
+        var chromeStates: [SessionInitialChromeState] = []
+
+        output.initialChromeState
+            .emit(onNext: { chromeStates.append($0) })
+            .disposed(by: disposeBag)
+
+        viewDidLoadRelay.accept(())
+
+        XCTAssertEqual(chromeStates, [.newSession])
+    }
+
     func test_homeTap_emitsHomeRoute_forExplicitSessionExit() {
         let homeTapRelay = PublishRelay<Void>()
         let output = makeOutput(homeTap: homeTapRelay.asSignal())

@@ -76,6 +76,12 @@ final class SessionViewController: UIViewController {
             }
             .disposed(by: disposeBag)
 
+        output.initialChromeState
+            .emit(with: self) { owner, chromeState in
+                owner.rootView.render(chromeState: chromeState)
+            }
+            .disposed(by: disposeBag)
+
         output.route
             .emit(with: self) { owner, route in
                 owner.handle(route: route)
