@@ -14,6 +14,12 @@ enum SessionRoute: Equatable {
     case home
 }
 
+/// 상단 floating bar를 전체로 보여줄지, 접어서 보여줄지 나타냅니다.
+enum SessionTopBarState: Equatable {
+    case folded
+    case unfolded
+}
+
 /// Session 진입 입력을 WebView load command와 화면 route로 바꿉니다.
 final class SessionViewModel {
     struct Input {
