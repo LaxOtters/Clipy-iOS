@@ -154,6 +154,15 @@ final class SessionBottomSheetPolicyTests: XCTestCase {
         XCTAssertEqual(expandedContent, .init(peek: 0, expanded: 1))
     }
 
+    func test_browserControlRowVisibility_showsOnlyWhileBrowsingChromeCanStayVisible() {
+        let sut = SessionBottomSheetPolicy.standard
+
+        XCTAssertFalse(sut.isBrowserControlRowVisible(for: .hidden))
+        XCTAssertTrue(sut.isBrowserControlRowVisible(for: .minimized))
+        XCTAssertTrue(sut.isBrowserControlRowVisible(for: .peek))
+        XCTAssertFalse(sut.isBrowserControlRowVisible(for: .expanded))
+    }
+
     private func dragEnded(
         endVisibleHeight: CGFloat,
         translationY: CGFloat,

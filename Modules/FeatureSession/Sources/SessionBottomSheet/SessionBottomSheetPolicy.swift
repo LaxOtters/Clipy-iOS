@@ -236,6 +236,18 @@ struct SessionBottomSheetPolicy: Equatable {
         )
     }
 
+    /// 브라우저가 보이는 minimized/peek 상태에서만 뒤로/앞으로/새로고침 row를 보여줍니다.
+    func isBrowserControlRowVisible(for state: SessionBottomSheetState) -> Bool {
+        switch state {
+        case .hidden:
+            return false
+        case .minimized, .peek:
+            return true
+        case .expanded:
+            return false
+        }
+    }
+
     private enum DragDirection {
         case upward
         case downward
