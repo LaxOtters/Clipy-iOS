@@ -11,13 +11,11 @@ import UIKit
 import RxCocoa
 import RxSwift
 
-/// Session 화면의 header와 browser 영역을 배치하는 root view입니다.
+/// Session WebView 위에 Top Bar와 Bottom Sheet를 겹쳐 배치하는 root view입니다.
 final class SessionView: UIView {
-    fileprivate let homeButton = UIButton(type: .system)
+    fileprivate let topBarView = SessionTopBarView()
     private let browserView = SessionWebView()
     fileprivate let bottomSheetView = SessionBottomSheetView()
-    private let headerView = UIView()
-    private let titleLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,56 +30,34 @@ final class SessionView: UIView {
     }
 
     private func configureHierarchy() {
-        addSubview(headerView)
         addSubview(browserView)
+        addSubview(topBarView)
         addSubview(bottomSheetView)
-
-        headerView.addSubview(homeButton)
-        headerView.addSubview(titleLabel)
     }
 
     private func configureStyle() {
         backgroundColor = .systemBackground
-        headerView.backgroundColor = .systemBackground
-
-        homeButton.setTitle("Home", for: .normal)
-        homeButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-
-        titleLabel.text = "Session"
-        titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textAlignment = .center
     }
 
     private func configureLayout() {
-        headerView.translatesAutoresizingMaskIntoConstraints = false
+        topBarView.translatesAutoresizingMaskIntoConstraints = false
         browserView.translatesAutoresizingMaskIntoConstraints = false
         bottomSheetView.translatesAutoresizingMaskIntoConstraints = false
-        homeButton.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            headerView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
-            headerView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            headerView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            headerView.heightAnchor.constraint(equalToConstant: 56),
-
-            browserView.topAnchor.constraint(equalTo: headerView.bottomAnchor),
+            browserView.topAnchor.constraint(equalTo: topAnchor),
             browserView.leadingAnchor.constraint(equalTo: leadingAnchor),
             browserView.trailingAnchor.constraint(equalTo: trailingAnchor),
             browserView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
+            topBarView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
+            topBarView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
+            topBarView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
+
             bottomSheetView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
             bottomSheetView.leadingAnchor.constraint(equalTo: leadingAnchor),
             bottomSheetView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            bottomSheetView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            homeButton.leadingAnchor.constraint(equalTo: headerView.layoutMarginsGuide.leadingAnchor),
-            homeButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-
-            titleLabel.centerXAnchor.constraint(equalTo: headerView.centerXAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: homeButton.trailingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: headerView.layoutMarginsGuide.trailingAnchor)
+            bottomSheetView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 }
@@ -94,6 +70,11 @@ extension SessionView {
         browserView.load(url: url)
     }
 
+    /// 새 Session의 첫 화면에서 Top Bar가 어떤 모습으로 시작할지 반영합니다.
+    func render(chromeState: SessionInitialChromeState) {
+        topBarView.render(state: chromeState.topBarState)
+    }
+
     /// Bottom Sheet ViewModel state를 내부 sheet component에 전달합니다.
     func render(bottomSheetState: SessionBottomSheetState, animated: Bool) {
         bottomSheetView.render(state: bottomSheetState, animated: animated)
@@ -103,9 +84,9 @@ extension SessionView {
 // MARK: - Reactive
 
 extension Reactive where Base: SessionView {
-    /// Home button tap을 화면 종료 input으로 엽니다.
+    /// Top Bar의 Home tap을 화면 종료 input으로 엽니다.
     var homeTap: ControlEvent<Void> {
-        base.homeButton.rx.tap
+        base.topBarView.rx.homeTap
     }
 
     /// Bottom Sheet grabber drag 종료 action을 ViewModel input으로 엽니다.

@@ -29,6 +29,12 @@ final class SessionBottomSheetView: UIView {
 
     private let grabberHitAreaView = UIView()
     private let grabberView = UIView()
+    private let browserControlRowStackView = UIStackView()
+    private let previousButton = UIButton(type: .system)
+    private let nextButton = UIButton(type: .system)
+    private let urlContainerView = UIView()
+    private let urlLabel = UILabel()
+    private let refreshButton = UIButton(type: .system)
     private let peekTitleLabel = UILabel()
     private let peekDescriptionLabel = UILabel()
     private let peekContentStackView = UIStackView()
@@ -61,10 +67,16 @@ final class SessionBottomSheetView: UIView {
 
     private func configureHierarchy() {
         addSubview(grabberHitAreaView)
+        addSubview(browserControlRowStackView)
         addSubview(peekContentStackView)
         addSubview(expandedContentStackView)
 
         grabberHitAreaView.addSubview(grabberView)
+        browserControlRowStackView.addArrangedSubview(previousButton)
+        browserControlRowStackView.addArrangedSubview(nextButton)
+        browserControlRowStackView.addArrangedSubview(urlContainerView)
+        browserControlRowStackView.addArrangedSubview(refreshButton)
+        urlContainerView.addSubview(urlLabel)
         peekContentStackView.addArrangedSubview(peekTitleLabel)
         peekContentStackView.addArrangedSubview(peekDescriptionLabel)
         expandedContentStackView.addArrangedSubview(expandedTitleLabel)
@@ -83,6 +95,29 @@ final class SessionBottomSheetView: UIView {
         grabberView.backgroundColor = .tertiaryLabel
         grabberView.layer.cornerRadius = Layout.grabberHeight / 2
 
+        browserControlRowStackView.axis = .horizontal
+        browserControlRowStackView.alignment = .center
+        browserControlRowStackView.spacing = 8
+        browserControlRowStackView.layoutMargins = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
+        browserControlRowStackView.isLayoutMarginsRelativeArrangement = true
+
+        previousButton.setTitle("‹", for: .normal)
+        previousButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
+
+        nextButton.setTitle("›", for: .normal)
+        nextButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
+
+        urlContainerView.backgroundColor = .tertiarySystemBackground
+        urlContainerView.layer.cornerRadius = 12
+
+        urlLabel.text = "Search or enter URL"
+        urlLabel.font = .preferredFont(forTextStyle: .subheadline)
+        urlLabel.textColor = .secondaryLabel
+        urlLabel.lineBreakMode = .byTruncatingMiddle
+
+        refreshButton.setTitle("↻", for: .normal)
+        refreshButton.titleLabel?.font = .preferredFont(forTextStyle: .title3)
+
         [peekContentStackView, expandedContentStackView].forEach {
             $0.axis = .vertical
             $0.alignment = .fill
@@ -91,11 +126,11 @@ final class SessionBottomSheetView: UIView {
             $0.isLayoutMarginsRelativeArrangement = true
         }
 
-        peekTitleLabel.text = "URL Bar"
+        peekTitleLabel.text = "No items yet"
         peekTitleLabel.font = .preferredFont(forTextStyle: .headline)
         peekTitleLabel.textColor = .label
 
-        peekDescriptionLabel.text = "Preview placeholder"
+        peekDescriptionLabel.text = "Add an item from the Top Bar to start comparing."
         peekDescriptionLabel.font = .preferredFont(forTextStyle: .subheadline)
         peekDescriptionLabel.textColor = .secondaryLabel
         peekDescriptionLabel.numberOfLines = 0
@@ -110,6 +145,12 @@ final class SessionBottomSheetView: UIView {
         expandedDescriptionLabel.numberOfLines = 0
 
         accessibilityIdentifier = "sessionBottomSheet"
+        browserControlRowStackView.accessibilityIdentifier = "sessionBottomSheet.browserControls"
+        previousButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.previous"
+        nextButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.next"
+        urlLabel.accessibilityIdentifier = "sessionBottomSheet.browserControls.url"
+        refreshButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.refresh"
+        peekContentStackView.accessibilityIdentifier = "sessionBottomSheet.peekEmptyState"
     }
 
     private func configureGesture() {
@@ -120,6 +161,9 @@ final class SessionBottomSheetView: UIView {
     private func configureLayout() {
         grabberHitAreaView.translatesAutoresizingMaskIntoConstraints = false
         grabberView.translatesAutoresizingMaskIntoConstraints = false
+        browserControlRowStackView.translatesAutoresizingMaskIntoConstraints = false
+        urlContainerView.translatesAutoresizingMaskIntoConstraints = false
+        urlLabel.translatesAutoresizingMaskIntoConstraints = false
         peekContentStackView.translatesAutoresizingMaskIntoConstraints = false
         expandedContentStackView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -134,7 +178,17 @@ final class SessionBottomSheetView: UIView {
             grabberView.widthAnchor.constraint(equalToConstant: Layout.grabberWidth),
             grabberView.heightAnchor.constraint(equalToConstant: Layout.grabberHeight),
 
-            peekContentStackView.topAnchor.constraint(equalTo: grabberHitAreaView.bottomAnchor, constant: 8),
+            browserControlRowStackView.topAnchor.constraint(equalTo: grabberHitAreaView.bottomAnchor, constant: 4),
+            browserControlRowStackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            browserControlRowStackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+
+            urlContainerView.heightAnchor.constraint(equalToConstant: 36),
+            urlLabel.topAnchor.constraint(equalTo: urlContainerView.topAnchor, constant: 8),
+            urlLabel.leadingAnchor.constraint(equalTo: urlContainerView.leadingAnchor, constant: 12),
+            urlLabel.trailingAnchor.constraint(equalTo: urlContainerView.trailingAnchor, constant: -12),
+            urlLabel.bottomAnchor.constraint(equalTo: urlContainerView.bottomAnchor, constant: -8),
+
+            peekContentStackView.topAnchor.constraint(equalTo: browserControlRowStackView.bottomAnchor, constant: 12),
             peekContentStackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             peekContentStackView.trailingAnchor.constraint(equalTo: trailingAnchor),
 
@@ -219,9 +273,10 @@ extension SessionBottomSheetView {
         }
     }
 
-    /// ViewModel state를 sheet snap 위치와 content alpha로 렌더링합니다.
+    /// ViewModel state를 sheet 위치와 browser control row 노출 상태로 렌더링합니다.
     func render(state: SessionBottomSheetState, animated: Bool) {
         renderedState = state
+        browserControlRowStackView.isHidden = !policy.isBrowserControlRowVisible(for: state)
         setOffset(policy.offset(for: state, availableHeight: bounds.height), animated: animated)
     }
 
