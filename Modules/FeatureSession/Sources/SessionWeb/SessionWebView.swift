@@ -20,8 +20,13 @@ final class SessionWebView: UIView {
     fileprivate let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
     /// WebKit navigation 실패를 feature-owned event로 내보내는 relay입니다.
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
+    fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollEvent>()
+    fileprivate let navigationFinishedRelay = PublishRelay<Void>()
     /// WebKit KVO lifecycle을 SessionWebView 생명주기에 묶어두는 token 목록입니다.
     private var observations: [NSKeyValueObservation] = []
+    private let rootScrollPolicy = SessionWebRootScrollPolicy()
+    private var lastRootContentOffsetY: CGFloat = 0
+    private var hasObservedRootScroll = false
 
     override init(frame: CGRect) {
         webView = WKWebView(frame: .zero)
@@ -35,11 +40,12 @@ final class SessionWebView: UIView {
         nil
     }
 
-    /// WKWebView를 wrapper 전체에 채우고 navigation delegate를 연결합니다.
+    /// WKWebView를 wrapper 전체에 채우고 navigation/scroll delegate를 연결합니다.
     private func configureView() {
         backgroundColor = .systemBackground
 
         webView.navigationDelegate = self
+        webView.scrollView.delegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -120,6 +126,16 @@ extension Reactive where Base: SessionWebView {
     var navigationFailure: Signal<SessionWebNavigationFailure> {
         base.navigationFailureRelay.asSignal()
     }
+
+    /// WebView root scroll 중 chrome 전환 판단에 쓸 event만 전달합니다.
+    var rootScroll: Signal<SessionWebRootScrollEvent> {
+        base.rootScrollRelay.asSignal()
+    }
+
+    /// load/restore 뒤 chrome을 되돌릴지 판단할 때 쓰는 WebKit navigation finish event입니다.
+    var navigationFinished: Signal<Void> {
+        base.navigationFinishedRelay.asSignal()
+    }
 }
 
 extension SessionWebView: WKNavigationDelegate {
@@ -128,9 +144,10 @@ extension SessionWebView: WKNavigationDelegate {
         emitState()
     }
 
-    /// WebKit navigation 완료 시 최신 browser state를 방출합니다.
+    /// WebKit navigation 완료 시 browser state와 navigation finish event를 함께 내보냅니다.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         emitState()
+        navigationFinishedRelay.accept(())
     }
 
     /// Commit 이후 navigation 실패를 feature-owned failure event로 변환합니다.
@@ -155,5 +172,35 @@ extension SessionWebView: WKNavigationDelegate {
         navigationFailureRelay.accept(
             .provisional(SessionWebNavigationFailureContext(error: error))
         )
+    }
+}
+
+// MARK: - UIScrollViewDelegate
+
+extension SessionWebView: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let currentOffsetY = scrollView.contentOffset.y
+
+        guard hasObservedRootScroll else {
+            // 첫 scroll callback은 비교할 이전 offset이 없어 chrome 전환 신호로 보지 않습니다.
+            hasObservedRootScroll = true
+            lastRootContentOffsetY = currentOffsetY
+            return
+        }
+
+        let event = rootScrollPolicy.event(
+            previousOffsetY: lastRootContentOffsetY,
+            currentOffsetY: currentOffsetY,
+            contentHeight: scrollView.contentSize.height,
+            viewportHeight: scrollView.bounds.height,
+            adjustedContentInsetTop: scrollView.adjustedContentInset.top,
+            adjustedContentInsetBottom: scrollView.adjustedContentInset.bottom,
+            isUserInteracting: scrollView.isDragging || scrollView.isDecelerating || scrollView.isTracking
+        )
+        lastRootContentOffsetY = currentOffsetY
+
+        if let event {
+            rootScrollRelay.accept(event)
+        }
     }
 }
