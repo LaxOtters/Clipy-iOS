@@ -13,8 +13,7 @@ public enum SessionFeature {
         context: SessionLaunchContext
     ) -> UIViewController {
         SessionViewController(
-            viewModel: SessionViewModel(context: context),
-            bottomSheetViewModel: SessionBottomSheetViewModel()
+            viewModel: SessionViewModel(context: context)
         )
     }
 }

@@ -22,7 +22,7 @@ final class SessionTopBarView: UIView {
     fileprivate let homeButton = UIButton(type: .system)
     private let titleLabel = UILabel()
     private let addItemButton = UIButton(type: .system)
-    private let toggleButton = UIButton(type: .system)
+    fileprivate let toggleButton = UIButton(type: .system)
     private let contentStackView = UIStackView()
     private var renderedState: SessionTopBarState = .unfolded
 
@@ -104,7 +104,7 @@ final class SessionTopBarView: UIView {
 // MARK: - Interface
 
 extension SessionTopBarView {
-    /// 접힘 상태에 맞춰 버튼 노출과 toggle title을 맞춥니다.
+    /// 접힘 상태에 맞게 보일 control과 toggle title을 맞춥니다.
     func render(state: SessionTopBarState) {
         renderedState = state
 
@@ -128,5 +128,9 @@ extension SessionTopBarView {
 extension Reactive where Base: SessionTopBarView {
     var homeTap: ControlEvent<Void> {
         base.homeButton.rx.tap
+    }
+
+    var toggleTap: ControlEvent<Void> {
+        base.toggleButton.rx.tap
     }
 }
