@@ -24,9 +24,7 @@ final class SessionWebView: UIView {
     fileprivate let navigationFinishedRelay = PublishRelay<Void>()
     /// WebKit KVO lifecycle을 SessionWebView 생명주기에 묶어두는 token 목록입니다.
     private var observations: [NSKeyValueObservation] = []
-    private let rootScrollPolicy = SessionWebRootScrollPolicy()
-    private var lastRootContentOffsetY: CGFloat = 0
-    private var hasObservedRootScroll = false
+    private var rootScrollTracker = SessionWebRootScrollTracker()
 
     override init(frame: CGRect) {
         webView = WKWebView(frame: .zero)
@@ -181,15 +179,7 @@ extension SessionWebView: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         let currentOffsetY = scrollView.contentOffset.y
 
-        guard hasObservedRootScroll else {
-            // 첫 scroll callback은 비교할 이전 offset이 없어 chrome 전환 신호로 보지 않습니다.
-            hasObservedRootScroll = true
-            lastRootContentOffsetY = currentOffsetY
-            return
-        }
-
-        let event = rootScrollPolicy.event(
-            previousOffsetY: lastRootContentOffsetY,
+        let event = rootScrollTracker.event(
             currentOffsetY: currentOffsetY,
             contentHeight: scrollView.contentSize.height,
             viewportHeight: scrollView.bounds.height,
@@ -197,10 +187,32 @@ extension SessionWebView: UIScrollViewDelegate {
             adjustedContentInsetBottom: scrollView.adjustedContentInset.bottom,
             isUserInteracting: scrollView.isDragging || scrollView.isDecelerating || scrollView.isTracking
         )
-        lastRootContentOffsetY = currentOffsetY
 
         if let event {
             rootScrollRelay.accept(event)
         }
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        rootScrollTracker.reset(anchorOffsetY: scrollView.contentOffset.y)
+    }
+
+    func scrollViewDidEndDragging(
+        _ scrollView: UIScrollView,
+        willDecelerate decelerate: Bool
+    ) {
+        guard !decelerate else {
+            return
+        }
+
+        rootScrollTracker.reset(anchorOffsetY: scrollView.contentOffset.y)
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        rootScrollTracker.reset(anchorOffsetY: scrollView.contentOffset.y)
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        rootScrollTracker.reset(anchorOffsetY: scrollView.contentOffset.y)
     }
 }

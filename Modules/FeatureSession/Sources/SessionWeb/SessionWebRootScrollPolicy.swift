@@ -87,3 +87,52 @@ struct SessionWebRootScrollPolicy: Equatable {
         return scrollableHeight >= viewportHeight * minimumScrollableViewportRatio
     }
 }
+
+/// Root scroll threshold를 callback 단위가 아니라 사용자 scroll 의도 단위로 계산합니다.
+struct SessionWebRootScrollTracker: Equatable {
+    private let policy: SessionWebRootScrollPolicy
+    private var anchorOffsetY: CGFloat?
+
+    init(policy: SessionWebRootScrollPolicy = SessionWebRootScrollPolicy()) {
+        self.policy = policy
+    }
+
+    mutating func reset(anchorOffsetY: CGFloat) {
+        self.anchorOffsetY = anchorOffsetY
+    }
+
+    mutating func event(
+        currentOffsetY: CGFloat,
+        contentHeight: CGFloat,
+        viewportHeight: CGFloat,
+        adjustedContentInsetTop: CGFloat,
+        adjustedContentInsetBottom: CGFloat,
+        isUserInteracting: Bool
+    ) -> SessionWebRootScrollEvent? {
+        guard let anchorOffsetY else {
+            self.anchorOffsetY = currentOffsetY
+            return nil
+        }
+
+        guard isUserInteracting else {
+            self.anchorOffsetY = currentOffsetY
+            return nil
+        }
+
+        let event = policy.event(
+            previousOffsetY: anchorOffsetY,
+            currentOffsetY: currentOffsetY,
+            contentHeight: contentHeight,
+            viewportHeight: viewportHeight,
+            adjustedContentInsetTop: adjustedContentInsetTop,
+            adjustedContentInsetBottom: adjustedContentInsetBottom,
+            isUserInteracting: true
+        )
+
+        if event != nil {
+            self.anchorOffsetY = currentOffsetY
+        }
+
+        return event
+    }
+}
