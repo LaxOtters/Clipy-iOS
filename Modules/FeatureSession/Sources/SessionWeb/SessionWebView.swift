@@ -14,13 +14,13 @@ import RxSwift
 
 /// Session 안에서 웹 탐색을 담당하고 WebKit detail을 wrapper 뒤에 숨깁니다.
 final class SessionWebView: UIView {
-    /// 실제 웹 탐색을 수행하는 WebKit view입니다.
     private let webView: WKWebView
     /// WebView의 현재 URL, loading, back 가능 상태를 보관하는 relay입니다.
     fileprivate let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
     /// WebKit navigation 실패를 feature-owned event로 내보내는 relay입니다.
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
+    fileprivate let navigationFinishedRelay = PublishRelay<Void>()
     /// WebKit KVO lifecycle을 SessionWebView 생명주기에 묶어두는 token 목록입니다.
     private var observations: [NSKeyValueObservation] = []
     private let rootScrollAdapter = SessionWebRootScrollAdapter()
@@ -37,7 +37,6 @@ final class SessionWebView: UIView {
         nil
     }
 
-    /// WKWebView를 wrapper 전체에 채우고 navigation delegate를 연결합니다.
     private func configureView() {
         backgroundColor = .systemBackground
 
@@ -86,6 +85,10 @@ final class SessionWebView: UIView {
         navigationFailureRelay.accept(failure)
     }
 
+    func emitNavigationFinished() {
+        navigationFinishedRelay.accept(())
+    }
+
     func beginRootDragging(snapshot: SessionWebRootScrollSnapshot) {
         emitRootScroll(rootScrollAdapter.beginDragging(snapshot: snapshot))
     }
@@ -123,6 +126,7 @@ final class SessionWebView: UIView {
             adjustedContentInsetBottom: scrollView.adjustedContentInset.bottom
         )
     }
+
 }
 
 // MARK: - Interface
@@ -138,12 +142,10 @@ extension SessionWebView {
         webView.canGoBack
     }
 
-    /// 주어진 URL을 WebView에 load합니다.
     func load(url: URL) {
         webView.load(URLRequest(url: url))
     }
 
-    /// WebView history가 있으면 이전 페이지로 이동합니다.
     func goBack() {
         guard webView.canGoBack else {
             return
@@ -169,5 +171,10 @@ extension Reactive where Base: SessionWebView {
     /// WebView root scroll lifecycle을 chrome reducer input으로 제공합니다.
     var rootScroll: Signal<SessionWebRootScrollInput> {
         base.rootScrollRelay.asSignal()
+    }
+
+    /// WebKit navigation finish를 feature-owned event로 제공합니다.
+    var navigationFinished: Signal<Void> {
+        base.navigationFinishedRelay.asSignal()
     }
 }

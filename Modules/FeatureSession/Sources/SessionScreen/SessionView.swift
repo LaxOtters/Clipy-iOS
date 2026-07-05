@@ -14,7 +14,7 @@ import RxSwift
 /// Session WebView 위에 Top Bar와 Bottom Sheet를 겹쳐 배치하는 root view입니다.
 final class SessionView: UIView {
     fileprivate let topBarView = SessionTopBarView()
-    private let browserView = SessionWebView()
+    fileprivate let browserView = SessionWebView()
     fileprivate let bottomSheetView = SessionBottomSheetView()
 
     override init(frame: CGRect) {
@@ -70,14 +70,10 @@ extension SessionView {
         browserView.load(url: url)
     }
 
-    /// 새 Session의 첫 화면에서 Top Bar가 어떤 모습으로 시작할지 반영합니다.
-    func render(chromeState: SessionInitialChromeState) {
+    /// 공용 chrome state를 Top Bar와 Bottom Sheet에 함께 반영합니다.
+    func render(chromeState: SessionChromeState, animated: Bool) {
         topBarView.render(state: chromeState.topBarState)
-    }
-
-    /// Bottom Sheet ViewModel state를 내부 sheet component에 전달합니다.
-    func render(bottomSheetState: SessionBottomSheetState, animated: Bool) {
-        bottomSheetView.render(state: bottomSheetState, animated: animated)
+        bottomSheetView.render(state: chromeState.bottomSheetState, animated: animated)
     }
 }
 
@@ -89,7 +85,22 @@ extension Reactive where Base: SessionView {
         base.topBarView.rx.homeTap
     }
 
-    /// Bottom Sheet grabber drag 종료 action을 ViewModel input으로 엽니다.
+    /// Top Bar의 접기/펼치기 tap을 chrome reducer input으로 엽니다.
+    var topBarToggleTap: ControlEvent<Void> {
+        base.topBarView.rx.toggleTap
+    }
+
+    /// WebView root scroll lifecycle을 chrome reducer input으로 엽니다.
+    var webRootScroll: Signal<SessionWebRootScrollInput> {
+        base.browserView.rx.rootScroll
+    }
+
+    /// WebView navigation finish event를 ViewModel의 chrome 입력으로 엽니다.
+    var navigationFinished: Signal<Void> {
+        base.browserView.rx.navigationFinished
+    }
+
+    /// Bottom Sheet grabber drag 종료 action을 chrome reducer input으로 엽니다.
     var bottomSheetDragEnded: Signal<SessionBottomSheetAction> {
         base.bottomSheetView.rx.dragEnded
     }

@@ -8,14 +8,14 @@
 import WebKit
 
 extension SessionWebView: WKNavigationDelegate {
-    /// WebKit provisional navigation 시작 시 최신 browser state를 방출합니다.
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         emitState()
     }
 
-    /// WebKit navigation 완료 시 최신 browser state를 방출합니다.
+    /// didFinish 한 번으로 browser state와 feature-owned navigation finish event를 같이 방출합니다.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         emitState()
+        emitNavigationFinished()
     }
 
     /// Commit 이후 navigation 실패를 feature-owned failure event로 변환합니다.
