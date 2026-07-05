@@ -5,7 +5,7 @@
 //  Created by 박민서 on 7/5/26.
 //
 
-/// Session 화면의 Top Bar와 Bottom Sheet를 한 chrome 상태로 묶습니다.
+/// 화면에 실제로 그릴 Top Bar와 Bottom Sheet 조합을 나타냅니다.
 enum SessionChromeState: Equatable {
     case browsingHidden
     case browsingMinimized

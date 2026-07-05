@@ -7,25 +7,25 @@
 
 import CoreGraphics
 
-/// 손을 뗀 순간의 위치와 속도를 Policy가 읽을 수 있게 정규화한 입력입니다.
+/// Bottom Sheet에서 손을 뗀 순간을 detent 판단에 필요한 값으로 줄인 입력입니다.
 struct SessionBottomSheetDragEndContext: Equatable {
-    /// drag 시작점에서 손을 뗀 지점까지의 y축 이동량입니다.
+    /// 시작점에서 손을 뗀 지점까지의 y축 이동량입니다.
     let translationY: CGFloat
     /// 손을 뗀 순간의 y축 속도입니다. 음수는 위로, 양수는 아래로 끄는 방향입니다.
     let velocityY: CGFloat
-    /// 손을 뗀 위치를 sheet y축 offset 기준으로 바꾼 값입니다.
+    /// 손을 뗀 위치를 sheet offset 기준으로 바꾼 값입니다.
     let endOffset: CGFloat
-    /// detent 계산에 사용할 현재 sheet container 높이입니다.
+    /// 현재 sheet가 움직일 수 있는 container 높이입니다.
     let availableHeight: CGFloat
 }
 
-/// ViewModel이 Policy에 넘기는 Bottom Sheet 상태 변경 입력입니다.
+/// Bottom Sheet를 어디에 멈출지 판단할 때 쓰는 사용자 입력입니다.
 enum SessionBottomSheetAction: Equatable {
-    /// grabber drag가 끝났을 때의 위치와 속도 입력입니다.
     case dragEnded(SessionBottomSheetDragEndContext)
 }
 
-/// drag 속도, 종료 위치, detent 높이로 Bottom Sheet의 snap state와 content 노출을 정합니다.
+/// Bottom Sheet가 어디에 멈추고 content를 얼마나 보여줄지 계산합니다.
+/// View는 손을 따라 움직이고, 최종 detent 판단은 여기로 모읍니다.
 struct SessionBottomSheetPolicy: Equatable {
     private static let expandedOffset: CGFloat = 0
 
@@ -35,7 +35,7 @@ struct SessionBottomSheetPolicy: Equatable {
         retentionBand: 20
     )
 
-    /// Bottom Sheet가 각 state에서 화면에 남기는 높이 묶음입니다.
+    /// 각 상태가 화면 위에 남기는 기준 높이입니다.
     struct Detents: Equatable {
         static let standard = Detents(
             minimizedVisibleHeight: 120,
@@ -45,27 +45,21 @@ struct SessionBottomSheetPolicy: Equatable {
 
         /// Minimized에서 grabber와 URL bar가 들어갈 최소 chrome 높이입니다.
         let minimizedVisibleHeight: CGFloat
-        /// Hidden에서 WebView 집중을 위해 sheet를 완전히 내리는 높이입니다.
+        /// Hidden에서 sheet를 화면 아래로 내리는 높이입니다.
         let hiddenVisibleHeight: CGFloat
-        /// Peek에서 기본 탐색 컨텐츠가 보이는 노출 높이입니다.
+        /// Peek에서 URL bar와 item preview가 같이 보이는 높이입니다.
         let peekVisibleHeight: CGFloat
     }
 
-    /// drag progress에 따라 Peek/Expanded content를 교차 노출할 alpha 값입니다.
+    /// Peek와 Expanded content가 겹치는 구간에서 어느 쪽을 얼마나 보여줄지 나타냅니다.
     struct ContentAlpha: Equatable {
-        /// URL bar 아래 item preview 영역의 노출 정도입니다.
         let peek: CGFloat
-        /// 화면 전체 비교 컨텐츠의 노출 정도입니다.
         let expanded: CGFloat
     }
 
-    /// Expanded를 제외한 state별 sheet 높이입니다.
     let detents: Detents
-    /// endpoint보다 방향 의도를 우선할 fast drag 속도 기준입니다.
     let velocityThreshold: CGFloat
-    /// 현재 detent 주변에서 snap-back으로 볼 상하 허용 범위입니다.
     let retentionBand: CGFloat
-    /// drag progress에 따른 Peek/Expanded content cross-fade 적용 여부입니다.
     var isContentFadeEnabled: Bool
 
     init(
@@ -100,7 +94,7 @@ struct SessionBottomSheetPolicy: Equatable {
         )
     }
 
-    /// state가 화면 위에 남겨야 하는 실제 sheet 높이를 계산합니다.
+    /// 주어진 상태에서 화면 위에 남길 sheet 높이를 계산합니다.
     func visibleHeight(
         for state: SessionBottomSheetState,
         availableHeight: CGFloat
@@ -119,7 +113,7 @@ struct SessionBottomSheetPolicy: Equatable {
         }
     }
 
-    /// state에 snap하기 위해 적용할 y축 offset을 계산합니다.
+    /// 주어진 상태로 snap하기 위해 sheet를 아래로 내릴 거리를 계산합니다.
     func offset(
         for state: SessionBottomSheetState,
         availableHeight: CGFloat
@@ -128,7 +122,7 @@ struct SessionBottomSheetPolicy: Equatable {
         return availableHeight - visibleHeight(for: state, availableHeight: availableHeight)
     }
 
-    /// drag action을 현재 state에서의 다음 snap state로 해석합니다.
+    /// 사용자가 놓은 방향과 위치를 다음 Bottom Sheet 상태로 해석합니다.
     func nextState(
         from state: SessionBottomSheetState,
         action: SessionBottomSheetAction
@@ -150,7 +144,7 @@ struct SessionBottomSheetPolicy: Equatable {
         }
     }
 
-    /// 느린 drag의 종료 높이와 방향으로 target state를 고릅니다.
+    /// 빠른 flick가 아닐 때는 끝난 높이와 방향을 같이 보고 target을 고릅니다.
     private func targetState(
         from state: SessionBottomSheetState,
         context: SessionBottomSheetDragEndContext
@@ -182,7 +176,6 @@ struct SessionBottomSheetPolicy: Equatable {
         )
     }
 
-    /// gesture 종료 offset을 snap zone 비교용 노출 높이로 바꿉니다.
     private func visibleHeight(
         forEndOffset endOffset: CGFloat,
         availableHeight: CGFloat
@@ -191,7 +184,7 @@ struct SessionBottomSheetPolicy: Equatable {
         return min(max(availableHeight - endOffset, 0), availableHeight)
     }
 
-    /// drag 중인 offset을 sheet가 움직일 수 있는 범위 안으로 보정합니다.
+    /// 손을 따라 움직이는 동안에도 sheet가 화면 밖으로 과하게 나가지 않게 잡아줍니다.
     func adjustedOffset(
         _ proposedOffset: CGFloat,
         availableHeight: CGFloat
@@ -200,7 +193,7 @@ struct SessionBottomSheetPolicy: Equatable {
         return min(max(proposedOffset, Self.expandedOffset), hiddenOffset)
     }
 
-    /// drag progress가 Peek→Expanded 구간에 있을 때 두 content의 alpha를 정합니다.
+    /// Peek에서 Expanded로 넘어가는 동안 두 content가 어색하게 겹치지 않게 alpha를 나눕니다.
     func contentAlpha(
         offset: CGFloat,
         availableHeight: CGFloat
@@ -236,7 +229,7 @@ struct SessionBottomSheetPolicy: Equatable {
         )
     }
 
-    /// 브라우저가 보이는 minimized/peek 상태에서만 뒤로/앞으로/새로고침 row를 보여줍니다.
+    /// browser control row는 웹을 함께 보는 높이에서만 노출합니다.
     func isBrowserControlRowVisible(for state: SessionBottomSheetState) -> Bool {
         switch state {
         case .hidden:
@@ -253,7 +246,7 @@ struct SessionBottomSheetPolicy: Equatable {
         case downward
     }
 
-    /// velocity가 threshold를 넘을 때만 endpoint보다 방향 의도를 우선합니다.
+    /// 충분히 빠른 flick만 위치보다 방향 의도가 강한 입력으로 봅니다.
     private func fastDragDirection(velocityY: CGFloat) -> DragDirection? {
         guard abs(velocityY) >= velocityThreshold else {
             return nil
@@ -262,7 +255,7 @@ struct SessionBottomSheetPolicy: Equatable {
         return velocityY < 0 ? .upward : .downward
     }
 
-    /// fast drag는 인접 state 대신 방향에 맞는 대표 target으로 보냅니다.
+    /// 빠른 flick는 중간 detent에 걸치지 않고 방향에 맞는 대표 상태로 보냅니다.
     private func fastTargetState(
         from state: SessionBottomSheetState,
         direction: DragDirection
@@ -281,7 +274,7 @@ struct SessionBottomSheetPolicy: Equatable {
         }
     }
 
-    /// slow drag는 현재 detent의 보류 영역을 벗어난 뒤 endpoint가 속한 snap zone을 따릅니다.
+    /// 느린 drag는 현재 detent 주변을 벗어난 뒤 끝난 위치가 속한 구간을 따릅니다.
     private func slowTargetState(
         from state: SessionBottomSheetState,
         direction: DragDirection,
@@ -339,7 +332,7 @@ struct SessionBottomSheetPolicy: Equatable {
         }
     }
 
-    /// translation이 거의 없으면 종료 높이 변화로 drag 방향을 보완합니다.
+    /// 움직임이 거의 없는 gesture는 시작/종료 높이 차이로 방향을 보완합니다.
     private func dragDirection(
         translationY: CGFloat,
         currentVisibleHeight: CGFloat,

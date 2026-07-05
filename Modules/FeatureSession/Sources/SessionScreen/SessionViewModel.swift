@@ -9,32 +9,27 @@ import Foundation
 
 import RxCocoa
 
-/// Session 화면에서 사용자가 의도한 화면 이동을 표현합니다.
 enum SessionRoute: Equatable {
-    /// Session 화면을 닫고 Home으로 돌아갑니다.
     case home
 }
 
-/// Session 진입과 chrome event를 URL load, chrome state, route output으로 바꿉니다.
+/// Session 화면에서 들어온 입력을 화면이 구독할 output으로 바꿉니다.
+/// Chrome 전환 판단은 reducer에 맡기고, ViewModel은 event 흐름을 연결하는 쪽에 둡니다.
 final class SessionViewModel {
     struct Input {
-        /// 화면 최초 진입 시 초기 URL load를 시작하는 lifecycle event입니다.
         let viewDidLoad: Signal<Void>
-        /// Home button tap으로 들어오는 화면 종료 event입니다.
         let homeTap: Signal<Void>
         let topBarToggleTap: Signal<Void>
         let webRootScroll: Signal<SessionWebRootScrollInput>
-        /// WebView navigation finish event입니다. 첫 finish는 새 Session의 peek 상태를 남기고, 이후 finish부터 browsing chrome 복원에 씁니다.
+        /// 첫 navigation finish는 새 Session의 peek 상태를 유지하고, 그 다음 finish부터 browsing chrome으로 복원합니다.
         let browserNavigationFinished: Signal<Void>
         let bottomSheetDragEnded: Signal<SessionBottomSheetAction>
     }
 
     struct Output {
-        /// Browser가 처음 load해야 하는 URL command입니다.
         let initialLoadURL: Signal<URL>
-        /// Top Bar와 Bottom Sheet가 같은 chrome state를 읽도록 내보냅니다.
+        /// 화면이 그대로 그릴 chrome 상태입니다.
         let chromeState: Driver<SessionChromeState>
-        /// ViewController가 처리해야 하는 화면 이동 의도입니다.
         let route: Signal<SessionRoute>
     }
 
@@ -133,7 +128,7 @@ private extension SessionChromeAction {
     var shouldRenderUnchangedPresentation: Bool {
         switch self {
         case .bottomSheetDragEnded:
-            // 같은 detent로 돌아오는 drag도 Bottom Sheet snap-back animation을 다시 걸어야 합니다.
+            // 같은 detent로 돌아와도 손을 따라간 sheet는 원래 자리로 다시 붙여야 합니다.
             return true
         case .topBarToggle, .webRootScroll, .navigationFinishedAfterInitialLoad:
             return false

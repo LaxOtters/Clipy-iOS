@@ -7,7 +7,8 @@
 
 import CoreGraphics
 
-/// Root scroll이 chrome 전환에 쓸 수 있는 방향과 page 조건을 계산합니다.
+/// WebView root scroll이 chrome 전환 신호로 볼 만한 움직임인지 계산합니다.
+/// 짧은 page, rubber-band, 약한 flick처럼 화면 의도로 보기 어려운 움직임을 걸러냅니다.
 struct SessionWebRootScrollPolicy: Equatable {
     private let dragThreshold: CGFloat
     private let flickVelocityThreshold: CGFloat
@@ -57,7 +58,7 @@ struct SessionWebRootScrollPolicy: Equatable {
     }
 
     func isInsideScrollableBounds(_ snapshot: SessionWebRootScrollSnapshot) -> Bool {
-        // rubber-band offset은 실제 page 이동이 아니어서 chrome 전이 신호에서 빼둡니다.
+        // rubber-band는 page를 읽는 움직임이 아니라 edge에서 튕긴 값이라 chrome 신호에서 뺍니다.
         let minimumOffsetY = -max(snapshot.adjustedContentInsetTop, 0)
         let maximumOffsetY = max(
             minimumOffsetY,
@@ -77,7 +78,7 @@ struct SessionWebRootScrollPolicy: Equatable {
     }
 }
 
-/// Chrome reducer가 presentation 전이를 판단할 때 쓰는 root scroll movement입니다.
+/// Reducer가 chrome 전환 후보로 읽는 root scroll 움직임입니다.
 struct SessionWebRootScrollMovement: Equatable {
     let direction: SessionWebRootScrollDirection
     let isEligibleForChromeTransition: Bool

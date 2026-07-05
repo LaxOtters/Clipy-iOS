@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Session WebView가 화면에 알려야 하는 URL, loading, back 가능 상태입니다.
+/// WebView wrapper 밖에서 화면이 알아야 할 browser 상태만 남깁니다.
 struct SessionBrowserState: Equatable {
     let currentURL: URL?
     let isLoading: Bool

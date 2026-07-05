@@ -10,7 +10,8 @@ import UIKit
 import RxCocoa
 import RxSwift
 
-/// Session에서 Home, 제목, item 추가, 접기/펼치기를 담는 상단 floating bar입니다.
+/// Session 화면 위에 떠 있는 상단 bar입니다.
+/// Home과 chrome 접기/펼치기처럼 화면 전체에 영향을 주는 입력이 여기서 시작됩니다.
 final class SessionTopBarView: UIView {
     private enum Layout {
         static let height: CGFloat = 56
@@ -104,7 +105,7 @@ final class SessionTopBarView: UIView {
 // MARK: - Interface
 
 extension SessionTopBarView {
-    /// 접힘 상태에 맞춰 버튼 노출과 toggle title을 맞춥니다.
+    /// 접힌 상태에서는 화면을 넓게 쓰도록 핵심 toggle만 남깁니다.
     func render(state: SessionTopBarState) {
         renderedState = state
 

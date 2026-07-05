@@ -7,7 +7,8 @@
 
 import CoreGraphics
 
-/// UIScrollViewDelegate callback 순서를 chrome reducer가 읽을 수 있는 root scroll input으로 바꿉니다.
+/// WebView scroll callback을 Session 쪽에서 읽기 쉬운 drag 흐름으로 바꿉니다.
+/// UIKit callback 순서와 flick 방향만 정리하고, chrome을 바꿀지는 판단하지 않습니다.
 final class SessionWebRootScrollAdapter {
     private var isDragging = false
     private var pendingDragEndContentVelocityY: CGFloat?

@@ -7,7 +7,7 @@
 
 import CoreGraphics
 
-/// UIScrollView 전체를 넘기지 않고 chrome 전이에 필요한 위치와 page 크기만 남긴 값입니다.
+/// WebView root scroll을 chrome 판단에 필요한 값으로 줄인 snapshot입니다.
 struct SessionWebRootScrollSnapshot: Equatable {
     let offsetY: CGFloat
     let contentHeight: CGFloat
@@ -16,14 +16,14 @@ struct SessionWebRootScrollSnapshot: Equatable {
     let adjustedContentInsetBottom: CGFloat
 }
 
-/// 사용자가 WebView drag를 끝낸 순간 reducer가 한 번만 flick를 판단할 때 쓰는 입력입니다.
+/// 손을 뗀 순간의 위치와 속도로 flick 의도를 한 번만 판단하게 해주는 입력입니다.
 struct SessionWebRootDragEndContext: Equatable {
     let snapshot: SessionWebRootScrollSnapshot
-    /// content offset 기준 속도입니다. 양수면 page down, 음수면 page up 방향입니다.
+    /// content offset 기준 속도입니다. 양수면 page down, 음수면 page up입니다.
     let velocityY: CGFloat
 }
 
-/// WebKit/UIScrollView callback을 FeatureSession 안에서 다루기 좋게 바꾼 lifecycle input입니다.
+/// UIKit scroll callback을 Session chrome이 읽을 수 있는 drag lifecycle로 바꾼 입력입니다.
 enum SessionWebRootScrollInput: Equatable {
     case dragBegan(SessionWebRootScrollSnapshot)
     case dragged(SessionWebRootScrollSnapshot)

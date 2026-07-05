@@ -11,12 +11,12 @@ import RxCocoa
 import RxRelay
 import RxSwift
 
-/// Session WebView 위에서 grabber drag와 state render를 담당하는 Bottom Sheet view입니다.
+/// WebView 위에 떠 있는 Bottom Sheet를 그리고, grabber drag를 화면 입력으로 바꿉니다.
 final class SessionBottomSheetView: UIView {
     private enum Layout {
         static let grabberWidth: CGFloat = 44
         static let grabberHeight: CGFloat = 5
-        /// 시각적 grabber보다 넓게 둔 drag 시작 영역입니다.
+        /// 작은 grabber를 꼭 집지 않아도 sheet를 움직일 수 있게 둔 영역입니다.
         static let grabberHitAreaHeight: CGFloat = 32
         static let cornerRadius: CGFloat = 20
     }
@@ -198,7 +198,7 @@ final class SessionBottomSheetView: UIView {
         ])
     }
 
-    /// drag 중에는 손 위치를 따라가고, 손을 뗀 뒤에만 state 변경을 요청합니다.
+    /// drag 중에는 손을 그대로 따라가고, 손을 뗀 순간에만 다음 상태 판단을 요청합니다.
     @objc
     private func handlePan(_ gesture: UIPanGestureRecognizer) {
         switch gesture.state {
@@ -216,7 +216,7 @@ final class SessionBottomSheetView: UIView {
         }
     }
 
-    /// UIKit pan gesture를 Policy input으로 바꿉니다.
+    /// UIKit pan gesture에서 detent 판단에 필요한 값만 뽑습니다.
     private func dragEndContext(for gesture: UIPanGestureRecognizer) -> SessionBottomSheetDragEndContext {
         let translationY = gesture.translation(in: self).y
         let proposedEndOffset = dragStartOffset + translationY
@@ -230,7 +230,7 @@ final class SessionBottomSheetView: UIView {
         )
     }
 
-    /// sheet offset과 content alpha를 한 번에 화면에 반영합니다.
+    /// sheet 위치와 Peek/Expanded content 노출을 같은 frame에서 맞춥니다.
     private func setOffset(_ offset: CGFloat, animated: Bool) {
         let adjustedOffset = policy.adjustedOffset(offset, availableHeight: bounds.height)
         currentOffset = adjustedOffset
@@ -264,7 +264,7 @@ final class SessionBottomSheetView: UIView {
 // MARK: - Interface
 
 extension SessionBottomSheetView {
-    /// drag progress에 따른 Peek/Expanded content cross-fade를 켜거나 끕니다.
+    /// Peek/Expanded content를 동시에 보여줄지, detent 기준으로 끊어 보여줄지 정합니다.
     var isContentFadeEnabled: Bool {
         get { policy.isContentFadeEnabled }
         set {
@@ -273,14 +273,14 @@ extension SessionBottomSheetView {
         }
     }
 
-    /// ViewModel state를 sheet 위치와 browser control row 노출 상태로 렌더링합니다.
+    /// 내려온 상태를 sheet 위치와 browser control row 노출로 그립니다.
     func render(state: SessionBottomSheetState, animated: Bool) {
         renderedState = state
         browserControlRowStackView.isHidden = !policy.isBrowserControlRowVisible(for: state)
         setOffset(policy.offset(for: state, availableHeight: bounds.height), animated: animated)
     }
 
-    /// 현재 bounds에서 state가 가리는 실제 sheet 높이입니다.
+    /// 현재 화면 크기에서 해당 상태가 실제로 차지하는 높이입니다.
     func visibleHeight(for state: SessionBottomSheetState) -> CGFloat {
         policy.visibleHeight(for: state, availableHeight: bounds.height)
     }
@@ -289,7 +289,7 @@ extension SessionBottomSheetView {
 // MARK: - Reactive
 
 extension Reactive where Base: SessionBottomSheetView {
-    /// grabber drag가 끝났을 때 ViewModel로 전달되는 action입니다.
+    /// grabber에서 끝난 drag를 ViewModel 입력으로 엽니다.
     var dragEnded: Signal<SessionBottomSheetAction> {
         base.dragEndedRelay.asSignal()
     }

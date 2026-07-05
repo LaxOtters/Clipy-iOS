@@ -5,7 +5,8 @@
 //  Created by 박민서 on 7/5/26.
 //
 
-/// Web root drag 중 다른 chrome 입력을 막기 위해 현재 조작 주체를 기록합니다.
+/// 사용자가 지금 어느 chrome 조작을 하고 있는지 나타냅니다.
+/// WebView를 끌고 있는 동안에는 다른 chrome 입력이 끼어들지 않게 합니다.
 enum SessionChromeInteraction: Equatable {
     case idle
     case webRootDragging(WebRootDragSession)
