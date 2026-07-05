@@ -13,8 +13,9 @@ import RxSwift
 
 @testable import FeatureSession
 
-/// Session 진입과 Home route가 ViewModel output으로 드러나는지 확인합니다.
 final class SessionViewModelTests: XCTestCase {
+    typealias Fixture = SessionViewModelTestFixture
+
     private var disposeBag: DisposeBag!
 
     override func setUp() {
@@ -30,7 +31,7 @@ final class SessionViewModelTests: XCTestCase {
     func test_viewDidLoadWithInitialURL_emitsInitialURL_readyForBrowsing() {
         let initialURL = URL(string: "https://www.google.com")!
         let viewDidLoadRelay = PublishRelay<Void>()
-        let output = makeOutput(
+        let output = Fixture.makeOutput(
             context: SessionLaunchContext(sessionId: UUID(), initialURL: initialURL),
             viewDidLoad: viewDidLoadRelay.asSignal()
         )
@@ -47,7 +48,7 @@ final class SessionViewModelTests: XCTestCase {
 
     func test_viewDidLoadWithoutInitialURL_doesNotEmitInitialURL_readyForEmptySession() {
         let viewDidLoadRelay = PublishRelay<Void>()
-        let output = makeOutput(
+        let output = Fixture.makeOutput(
             context: SessionLaunchContext(sessionId: UUID(), initialURL: nil),
             viewDidLoad: viewDidLoadRelay.asSignal()
         )
@@ -62,23 +63,9 @@ final class SessionViewModelTests: XCTestCase {
         XCTAssertTrue(loadedURLs.isEmpty)
     }
 
-    func test_viewDidLoad_emitsUnfoldedTopBarState_forNewSessionEntry() {
-        let viewDidLoadRelay = PublishRelay<Void>()
-        let output = makeOutput(viewDidLoad: viewDidLoadRelay.asSignal())
-        var chromeStates: [SessionInitialChromeState] = []
-
-        output.initialChromeState
-            .emit(onNext: { chromeStates.append($0) })
-            .disposed(by: disposeBag)
-
-        viewDidLoadRelay.accept(())
-
-        XCTAssertEqual(chromeStates, [.newSession])
-    }
-
     func test_homeTap_emitsHomeRoute_forExplicitSessionExit() {
         let homeTapRelay = PublishRelay<Void>()
-        let output = makeOutput(homeTap: homeTapRelay.asSignal())
+        let output = Fixture.makeOutput(homeTap: homeTapRelay.asSignal())
         var routes: [SessionRoute] = []
 
         output.route
@@ -88,19 +75,5 @@ final class SessionViewModelTests: XCTestCase {
         homeTapRelay.accept(())
 
         XCTAssertEqual(routes, [.home])
-    }
-
-    private func makeOutput(
-        context: SessionLaunchContext = SessionLaunchContext(sessionId: UUID()),
-        viewDidLoad: Signal<Void> = Signal.empty(),
-        homeTap: Signal<Void> = Signal.empty()
-    ) -> SessionViewModel.Output {
-        let viewModel = SessionViewModel(context: context)
-        return viewModel.transform(
-            input: SessionViewModel.Input(
-                viewDidLoad: viewDidLoad,
-                homeTap: homeTap
-            )
-        )
     }
 }

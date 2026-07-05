@@ -13,16 +13,11 @@ import RxSwift
 final class SessionViewController: UIViewController {
     private let rootView = SessionView()
     private let viewModel: SessionViewModel
-    private let bottomSheetViewModel: SessionBottomSheetViewModel
     private let disposeBag = DisposeBag()
     private var previousPopGestureEnabled: Bool?
 
-    init(
-        viewModel: SessionViewModel,
-        bottomSheetViewModel: SessionBottomSheetViewModel
-    ) {
+    init(viewModel: SessionViewModel) {
         self.viewModel = viewModel
-        self.bottomSheetViewModel = bottomSheetViewModel
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -59,14 +54,11 @@ final class SessionViewController: UIViewController {
         let output = viewModel.transform(
             input: SessionViewModel.Input(
                 viewDidLoad: .just(()),
-                homeTap: rootView.rx.homeTap.asSignal()
-            )
-        )
-
-        let bottomSheetOutput = bottomSheetViewModel.transform(
-            input: SessionBottomSheetViewModel.Input(
-                dragEnded: rootView.rx.bottomSheetDragEnded,
-                stateRequest: .empty()
+                homeTap: rootView.rx.homeTap.asSignal(),
+                topBarToggleTap: rootView.rx.topBarToggleTap.asSignal(),
+                webRootScroll: rootView.rx.webRootScroll,
+                browserNavigationFinished: rootView.rx.navigationFinished,
+                bottomSheetDragEnded: rootView.rx.bottomSheetDragEnded
             )
         )
 
@@ -76,21 +68,15 @@ final class SessionViewController: UIViewController {
             }
             .disposed(by: disposeBag)
 
-        output.initialChromeState
-            .emit(with: self) { owner, chromeState in
-                owner.rootView.render(chromeState: chromeState)
+        output.chromeState
+            .drive(with: self) { owner, chromeState in
+                owner.rootView.render(chromeState: chromeState, animated: true)
             }
             .disposed(by: disposeBag)
 
         output.route
             .emit(with: self) { owner, route in
                 owner.handle(route: route)
-            }
-            .disposed(by: disposeBag)
-
-        bottomSheetOutput.renderState
-            .drive(with: self) { owner, state in
-                owner.rootView.render(bottomSheetState: state, animated: true)
             }
             .disposed(by: disposeBag)
     }
