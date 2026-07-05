@@ -7,7 +7,8 @@
 
 import CoreGraphics
 
-/// WebView drag 한 번 동안 마지막 유효 offset을 잡아 threshold를 누적 판단합니다.
+/// WebView를 한 번 끄는 동안 어디서부터 얼마나 움직였는지 기억합니다.
+/// 천천히 끌거나 edge에서 튕겨도 chrome 전환 의도만 읽을 수 있게 anchor를 잡아줍니다.
 struct WebRootDragSession: Equatable {
     private var anchorOffsetY: CGFloat?
 

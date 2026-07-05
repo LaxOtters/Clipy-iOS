@@ -12,13 +12,12 @@ extension SessionWebView: WKNavigationDelegate {
         emitState()
     }
 
-    /// didFinish 한 번으로 browser state와 feature-owned navigation finish event를 같이 방출합니다.
+    /// didFinish는 browser state 갱신과 chrome 복원 신호가 함께 필요한 지점입니다.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         emitState()
         emitNavigationFinished()
     }
 
-    /// Commit 이후 navigation 실패를 feature-owned failure event로 변환합니다.
     func webView(
         _ webView: WKWebView,
         didFail navigation: WKNavigation!,
@@ -30,7 +29,6 @@ extension SessionWebView: WKNavigationDelegate {
         )
     }
 
-    /// Provisional navigation 실패를 feature-owned failure event로 변환합니다.
     func webView(
         _ webView: WKWebView,
         didFailProvisionalNavigation navigation: WKNavigation!,

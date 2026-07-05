@@ -12,16 +12,13 @@ import RxCocoa
 import RxRelay
 import RxSwift
 
-/// Session 안에서 웹 탐색을 담당하고 WebKit detail을 wrapper 뒤에 숨깁니다.
+/// Session 안의 WebKit detail을 감싸고, 밖으로는 FeatureSession에서 쓰는 event만 엽니다.
 final class SessionWebView: UIView {
     private let webView: WKWebView
-    /// WebView의 현재 URL, loading, back 가능 상태를 보관하는 relay입니다.
     fileprivate let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
-    /// WebKit navigation 실패를 feature-owned event로 내보내는 relay입니다.
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
     fileprivate let navigationFinishedRelay = PublishRelay<Void>()
-    /// WebKit KVO lifecycle을 SessionWebView 생명주기에 묶어두는 token 목록입니다.
     private var observations: [NSKeyValueObservation] = []
     private let rootScrollAdapter = SessionWebRootScrollAdapter()
 
@@ -55,7 +52,6 @@ final class SessionWebView: UIView {
         ])
     }
 
-    /// WebKit KVO 값을 감지해 browser state output으로 갱신합니다.
     private func observeBrowserState() {
         observations = [
             webView.observe(\.url, options: [.new]) { [weak self] _, _ in
@@ -70,7 +66,6 @@ final class SessionWebView: UIView {
         ]
     }
 
-    /// 현재 WebView 값을 읽어 `SessionBrowserState`로 방출합니다.
     func emitState() {
         stateRelay.accept(
             SessionBrowserState(
@@ -132,12 +127,10 @@ final class SessionWebView: UIView {
 // MARK: - Interface
 
 extension SessionWebView {
-    /// WebView가 현재 표시 중인 URL입니다.
     var currentURL: URL? {
         webView.url
     }
 
-    /// WebView history에서 뒤로 이동할 수 있는지 나타냅니다.
     var canGoBack: Bool {
         webView.canGoBack
     }
@@ -158,22 +151,20 @@ extension SessionWebView {
 // MARK: - Reactive
 
 extension Reactive where Base: SessionWebView {
-    /// WebView의 URL, loading, back 가능 상태를 UI binding용 state로 제공합니다.
     var state: Driver<SessionBrowserState> {
         base.stateRelay.asDriver()
     }
 
-    /// WebKit navigation 실패를 ViewModel이나 ViewController가 처리할 수 있는 event로 제공합니다.
     var navigationFailure: Signal<SessionWebNavigationFailure> {
         base.navigationFailureRelay.asSignal()
     }
 
-    /// WebView root scroll lifecycle을 chrome reducer input으로 제공합니다.
+    /// WebView의 root scroll을 chrome 판단용 drag 흐름으로 제공합니다.
     var rootScroll: Signal<SessionWebRootScrollInput> {
         base.rootScrollRelay.asSignal()
     }
 
-    /// WebKit navigation finish를 feature-owned event로 제공합니다.
+    /// navigation finish를 Session chrome 흐름에서 쓸 수 있게 엽니다.
     var navigationFinished: Signal<Void> {
         base.navigationFinishedRelay.asSignal()
     }

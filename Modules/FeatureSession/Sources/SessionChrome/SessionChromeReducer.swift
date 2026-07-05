@@ -5,7 +5,8 @@
 //  Created by 박민서 on 7/5/26.
 //
 
-/// Top Bar, WebView root scroll, Bottom Sheet drag를 하나의 chrome 상태 전이로 모읍니다.
+/// Session chrome이 접히고 펼쳐지는 흐름을 한 곳에서 정합니다.
+/// Top Bar, WebView scroll, Bottom Sheet 입력이 서로 엇갈리지 않게 여기로 모읍니다.
 struct SessionChromeReducer: Equatable {
     let bottomSheetPolicy: SessionBottomSheetPolicy
     let rootScrollPolicy: SessionWebRootScrollPolicy
