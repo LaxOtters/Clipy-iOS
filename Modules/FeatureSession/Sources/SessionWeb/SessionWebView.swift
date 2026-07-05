@@ -20,8 +20,10 @@ final class SessionWebView: UIView {
     fileprivate let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
     /// WebKit navigation 실패를 feature-owned event로 내보내는 relay입니다.
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
+    fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
     /// WebKit KVO lifecycle을 SessionWebView 생명주기에 묶어두는 token 목록입니다.
     private var observations: [NSKeyValueObservation] = []
+    private let rootScrollAdapter = SessionWebRootScrollAdapter()
 
     override init(frame: CGRect) {
         webView = WKWebView(frame: .zero)
@@ -40,6 +42,7 @@ final class SessionWebView: UIView {
         backgroundColor = .systemBackground
 
         webView.navigationDelegate = self
+        webView.scrollView.delegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -82,6 +85,44 @@ final class SessionWebView: UIView {
     func emitNavigationFailure(_ failure: SessionWebNavigationFailure) {
         navigationFailureRelay.accept(failure)
     }
+
+    func beginRootDragging(snapshot: SessionWebRootScrollSnapshot) {
+        emitRootScroll(rootScrollAdapter.beginDragging(snapshot: snapshot))
+    }
+
+    func emitRootDraggingIfNeeded(snapshot: SessionWebRootScrollSnapshot) {
+        emitRootScroll(rootScrollAdapter.scrollInput(snapshot: snapshot))
+    }
+
+    func prepareRootDragEnd(
+        releaseVelocityY: CGFloat,
+        targetOffsetY: CGFloat,
+        currentOffsetY: CGFloat
+    ) {
+        rootScrollAdapter.prepareDragEnd(
+            releaseVelocityY: releaseVelocityY,
+            targetOffsetY: targetOffsetY,
+            currentOffsetY: currentOffsetY
+        )
+    }
+
+    func endRootDragging(snapshot: SessionWebRootScrollSnapshot) {
+        emitRootScroll(rootScrollAdapter.endDragging(snapshot: snapshot))
+    }
+
+    func emitRootScroll(_ input: SessionWebRootScrollInput) {
+        rootScrollRelay.accept(input)
+    }
+
+    func scrollSnapshot(from scrollView: UIScrollView) -> SessionWebRootScrollSnapshot {
+        SessionWebRootScrollSnapshot(
+            offsetY: scrollView.contentOffset.y,
+            contentHeight: scrollView.contentSize.height,
+            viewportHeight: scrollView.bounds.height,
+            adjustedContentInsetTop: scrollView.adjustedContentInset.top,
+            adjustedContentInsetBottom: scrollView.adjustedContentInset.bottom
+        )
+    }
 }
 
 // MARK: - Interface
@@ -123,5 +164,10 @@ extension Reactive where Base: SessionWebView {
     /// WebKit navigation 실패를 ViewModel이나 ViewController가 처리할 수 있는 event로 제공합니다.
     var navigationFailure: Signal<SessionWebNavigationFailure> {
         base.navigationFailureRelay.asSignal()
+    }
+
+    /// WebView root scroll lifecycle을 chrome reducer input으로 제공합니다.
+    var rootScroll: Signal<SessionWebRootScrollInput> {
+        base.rootScrollRelay.asSignal()
     }
 }
