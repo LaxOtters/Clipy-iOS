@@ -15,37 +15,38 @@ enum SessionRoute: Equatable {
     case home
 }
 
-/// 새 Session의 첫 렌더링에 필요한 상단 chrome 상태입니다.
-struct SessionInitialChromeState: Equatable {
-    let topBarState: SessionTopBarState
-
-    static let newSession = SessionInitialChromeState(
-        topBarState: .unfolded
-    )
-}
-
-/// Session 진입 event와 home tap을 초기 URL load, 초기 chrome 상태, route로 바꿉니다.
+/// Session 진입과 chrome event를 URL load, chrome state, route output으로 바꿉니다.
 final class SessionViewModel {
     struct Input {
         /// 화면 최초 진입 시 초기 URL load를 시작하는 lifecycle event입니다.
         let viewDidLoad: Signal<Void>
         /// Home button tap으로 들어오는 화면 종료 event입니다.
         let homeTap: Signal<Void>
+        let topBarToggleTap: Signal<Void>
+        let webRootScroll: Signal<SessionWebRootScrollInput>
+        /// WebView navigation finish event입니다. 첫 finish는 새 Session의 peek 상태를 남기고, 이후 finish부터 browsing chrome 복원에 씁니다.
+        let browserNavigationFinished: Signal<Void>
+        let bottomSheetDragEnded: Signal<SessionBottomSheetAction>
     }
 
     struct Output {
         /// Browser가 처음 load해야 하는 URL command입니다.
         let initialLoadURL: Signal<URL>
-        /// 새 Session 진입 직후 Top Bar가 읽는 초기 chrome 상태입니다.
-        let initialChromeState: Signal<SessionInitialChromeState>
+        /// Top Bar와 Bottom Sheet가 같은 chrome state를 읽도록 내보냅니다.
+        let chromeState: Driver<SessionChromeState>
         /// ViewController가 처리해야 하는 화면 이동 의도입니다.
         let route: Signal<SessionRoute>
     }
 
     private let context: SessionLaunchContext
+    private let chromeReducer: SessionChromeReducer
 
-    init(context: SessionLaunchContext) {
+    init(
+        context: SessionLaunchContext,
+        chromeReducer: SessionChromeReducer = SessionChromeReducer()
+    ) {
         self.context = context
+        self.chromeReducer = chromeReducer
     }
 
     func transform(input: Input) -> Output {
@@ -54,16 +55,88 @@ final class SessionViewModel {
                 initialURL
             }
 
-        let initialChromeState = input.viewDidLoad
-            .map { SessionInitialChromeState.newSession }
+        let chromeState = chromeActions(from: input)
+            .asObservable()
+            .scan(ChromeRenderAccumulator.initial) { [chromeReducer] accumulator, action in
+                accumulator.reducing(action, reducer: chromeReducer)
+            }
+            .compactMap(\.renderedState)
+            .startWith(.newSession)
+            .asDriver(onErrorDriveWith: .empty())
 
         let route = input.homeTap
             .map { SessionRoute.home }
 
         return Output(
             initialLoadURL: initialLoadURL,
-            initialChromeState: initialChromeState,
+            chromeState: chromeState,
             route: route
         )
+    }
+
+    private func chromeActions(from input: Input) -> Signal<SessionChromeAction> {
+        let topBarToggle = input.topBarToggleTap
+            .map { SessionChromeAction.topBarToggle }
+
+        let rootScroll = input.webRootScroll
+            .map { SessionChromeAction.webRootScroll($0) }
+
+        let bottomSheetDragEnded = input.bottomSheetDragEnded
+            .map { SessionChromeAction.bottomSheetDragEnded($0) }
+
+        let navigationAfterInitialLoad = input.browserNavigationFinished
+            .asObservable()
+            .scan(0) { count, _ in count + 1 }
+            .compactMap { count -> SessionChromeAction? in
+                guard count > 1 else {
+                    return nil
+                }
+
+                return .navigationFinishedAfterInitialLoad
+            }
+            .asSignal(onErrorSignalWith: .empty())
+
+        return Signal.merge(
+            topBarToggle,
+            rootScroll,
+            bottomSheetDragEnded,
+            navigationAfterInitialLoad
+        )
+    }
+}
+
+private struct ChromeRenderAccumulator {
+    let reducerState: SessionChromeReducerState
+    let renderedState: SessionChromeState?
+
+    static let initial = ChromeRenderAccumulator(
+        reducerState: .newSession,
+        renderedState: nil
+    )
+
+    func reducing(
+        _ action: SessionChromeAction,
+        reducer: SessionChromeReducer
+    ) -> ChromeRenderAccumulator {
+        let nextState = reducer.reduce(reducerState, action: action)
+        let shouldRender = nextState.presentation != reducerState.presentation
+            || action.shouldRenderUnchangedPresentation
+
+        return ChromeRenderAccumulator(
+            reducerState: nextState,
+            renderedState: shouldRender ? nextState.presentation : nil
+        )
+    }
+}
+
+private extension SessionChromeAction {
+    var shouldRenderUnchangedPresentation: Bool {
+        switch self {
+        case .bottomSheetDragEnded:
+            // 같은 detent로 돌아오는 drag도 Bottom Sheet snap-back animation을 다시 걸어야 합니다.
+            return true
+        case .topBarToggle, .webRootScroll, .navigationFinishedAfterInitialLoad:
+            return false
+        }
     }
 }
