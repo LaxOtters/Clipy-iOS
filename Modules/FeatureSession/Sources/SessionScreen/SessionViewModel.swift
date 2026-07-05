@@ -15,12 +15,6 @@ enum SessionRoute: Equatable {
     case home
 }
 
-/// 상단 floating bar를 전체로 보여줄지, 접어서 보여줄지 나타냅니다.
-enum SessionTopBarState: Equatable {
-    case folded
-    case unfolded
-}
-
 /// 새 Session의 첫 렌더링에 필요한 상단 chrome 상태입니다.
 struct SessionInitialChromeState: Equatable {
     let topBarState: SessionTopBarState
