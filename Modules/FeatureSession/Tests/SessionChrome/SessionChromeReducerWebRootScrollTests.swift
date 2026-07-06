@@ -216,6 +216,36 @@ final class SessionChromeReducerWebRootScrollTests: XCTestCase {
         XCTAssertEqual(stillMinimized.presentation, .browsingMinimized)
     }
 
+    func test_dragEndOppositeVelocity_prefersDragDistance_forRootScrollIntent() {
+        let sut = SessionChromeReducer()
+        let dragging = sut.reduce(
+            Fixture.state(showing: .browsingMinimized),
+            action: .webRootScroll(.dragBegan(Fixture.snapshot(offsetY: 0)))
+        )
+        let hidden = sut.reduce(
+            dragging,
+            action: .webRootScroll(.dragEnded(Fixture.dragEnd(offsetY: 14, velocityY: -1_600)))
+        )
+
+        XCTAssertEqual(hidden.presentation, .browsingHidden)
+        XCTAssertEqual(hidden.interaction, .idle)
+    }
+
+    func test_dragEndOppositeVelocityFromHidden_prefersDragDistance_forRootScrollIntent() {
+        let sut = SessionChromeReducer()
+        let dragging = sut.reduce(
+            Fixture.state(showing: .browsingHidden),
+            action: .webRootScroll(.dragBegan(Fixture.snapshot(offsetY: 40)))
+        )
+        let minimized = sut.reduce(
+            dragging,
+            action: .webRootScroll(.dragEnded(Fixture.dragEnd(offsetY: 24, velocityY: 1_600)))
+        )
+
+        XCTAssertEqual(minimized.presentation, .browsingMinimized)
+        XCTAssertEqual(minimized.interaction, .idle)
+    }
+
     func test_dragEndOutOfBoundsWithHighVelocity_keepsChrome_andClearsInteraction() {
         let sut = SessionChromeReducer()
         let dragging = sut.reduce(
