@@ -30,7 +30,7 @@ struct SessionChromeReducer: Equatable {
         case .bottomSheetDragEnded(let action):
             return reduceBottomSheetDragEnded(state, action: action)
         case .navigationFinishedAfterInitialLoad:
-            return state.updatingPresentation(.browsingMinimized)
+            return reduceNavigationFinishedAfterInitialLoad(state)
         }
     }
 
@@ -114,6 +114,17 @@ struct SessionChromeReducer: Equatable {
         return state
             .updatingInteraction(.idle)
             .updatingPresentation(presentation(for: nextBottomSheetState, topBarState: state.presentation.topBarState))
+    }
+
+    private func reduceNavigationFinishedAfterInitialLoad(
+        _ state: SessionChromeReducerState
+    ) -> SessionChromeReducerState {
+        guard state.presentation == .newSession,
+              state.interaction == .idle else {
+            return state
+        }
+
+        return state.updatingPresentation(.browsingMinimized)
     }
 
     private func presentation(
