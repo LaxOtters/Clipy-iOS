@@ -103,4 +103,35 @@ final class SessionChromeReducerTests: XCTestCase {
 
         XCTAssertEqual(state.presentation, .browsingMinimized)
     }
+
+    func test_navigationAfterInitialLoad_keepsNewSessionChrome_duringActiveWebRootDrag() {
+        let sut = SessionChromeReducer()
+        let dragging = Fixture.draggingState(showing: .newSession)
+
+        let state = sut.reduce(
+            dragging,
+            action: .navigationFinishedAfterInitialLoad
+        )
+
+        XCTAssertEqual(state, dragging)
+    }
+
+    func test_navigationAfterInitialLoad_keepsChangedChrome_forUserInteractionDuringLoading() {
+        let sut = SessionChromeReducer()
+        let changedStates: [SessionChromeState] = [
+            .browsingHidden,
+            .browsingMinimized,
+            .comparingPeek(topBarState: .folded),
+            .comparingExpanded(topBarState: .unfolded)
+        ]
+
+        changedStates.forEach { presentation in
+            let state = sut.reduce(
+                Fixture.state(showing: presentation),
+                action: .navigationFinishedAfterInitialLoad
+            )
+
+            XCTAssertEqual(state.presentation, presentation)
+        }
+    }
 }
