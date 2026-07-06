@@ -69,7 +69,7 @@ final class SessionWebView: UIView {
     }
 
     /// 현재 WebView 값을 읽어 `SessionBrowserState`로 방출합니다.
-    private func emitState() {
+    func emitState() {
         stateRelay.accept(
             SessionBrowserState(
                 currentURL: webView.url,
@@ -77,6 +77,10 @@ final class SessionWebView: UIView {
                 canGoBack: webView.canGoBack
             )
         )
+    }
+
+    func emitNavigationFailure(_ failure: SessionWebNavigationFailure) {
+        navigationFailureRelay.accept(failure)
     }
 }
 
@@ -119,41 +123,5 @@ extension Reactive where Base: SessionWebView {
     /// WebKit navigation 실패를 ViewModel이나 ViewController가 처리할 수 있는 event로 제공합니다.
     var navigationFailure: Signal<SessionWebNavigationFailure> {
         base.navigationFailureRelay.asSignal()
-    }
-}
-
-extension SessionWebView: WKNavigationDelegate {
-    /// WebKit provisional navigation 시작 시 최신 browser state를 방출합니다.
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        emitState()
-    }
-
-    /// WebKit navigation 완료 시 최신 browser state를 방출합니다.
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        emitState()
-    }
-
-    /// Commit 이후 navigation 실패를 feature-owned failure event로 변환합니다.
-    func webView(
-        _ webView: WKWebView,
-        didFail navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        emitState()
-        navigationFailureRelay.accept(
-            .committed(SessionWebNavigationFailureContext(error: error))
-        )
-    }
-
-    /// Provisional navigation 실패를 feature-owned failure event로 변환합니다.
-    func webView(
-        _ webView: WKWebView,
-        didFailProvisionalNavigation navigation: WKNavigation!,
-        withError error: Error
-    ) {
-        emitState()
-        navigationFailureRelay.accept(
-            .provisional(SessionWebNavigationFailureContext(error: error))
-        )
     }
 }
