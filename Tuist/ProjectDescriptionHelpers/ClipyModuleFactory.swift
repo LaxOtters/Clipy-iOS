@@ -8,7 +8,7 @@
 import ProjectDescription
 
 public enum ClipyModuleFactory {
-    /// App target과 test target, shared scheme을 함께 만듭니다.
+    /// App target과 shared scheme을 만들고, 필요하면 test target을 함께 구성합니다.
     public static func makeApp(
         module: AppModule,
         dependencies: [AppDependency] = [],
@@ -34,17 +34,24 @@ public enum ClipyModuleFactory {
         return makeProject(module: module, targets: targets, hasTests: hasTests)
     }
 
-    /// Core framework target을 만듭니다. CoreData model은 persistence module처럼 필요한 Core에서만 넘깁니다.
+    /// Core framework를 만들고 필요하면 test target, resource, CoreData model을 함께 구성합니다.
+    /// resource bundle을 직접 찾는 모듈은 Tuist의 Bundle/resource accessor 자동 생성을 끌 수 있습니다.
     public static func makeCore(
         module: CoreModule,
         dependencies: [CoreDependency] = [],
         hasTests: Bool = true,
+        resources: ResourceFileElements? = nil,
+        synthesizesBundleAccessors: Bool = true,
+        synthesizesResourceAccessors: Bool = true,
         coreDataModels: [CoreDataModel] = []
     ) -> Project {
         makeFramework(
             module: module,
             dependencies: dependencies.map(\.targetDependency),
             hasTests: hasTests,
+            resources: resources,
+            synthesizesBundleAccessors: synthesizesBundleAccessors,
+            synthesizesResourceAccessors: synthesizesResourceAccessors,
             coreDataModels: coreDataModels
         )
     }
@@ -69,6 +76,9 @@ private extension ClipyModuleFactory {
         module: some ClipyModuleIdentifiable,
         dependencies: [TargetDependency],
         hasTests: Bool = true,
+        resources: ResourceFileElements? = nil,
+        synthesizesBundleAccessors: Bool = true,
+        synthesizesResourceAccessors: Bool = true,
         coreDataModels: [CoreDataModel] = []
     ) -> Project {
         var targets: [Target] = [
@@ -80,6 +90,7 @@ private extension ClipyModuleFactory {
                 deploymentTargets: ClipyProjectConfig.deploymentTargets,
                 infoPlist: .default,
                 sources: ["\(ClipyProjectConfig.sourcesDirectory)/**"],
+                resources: resources,
                 dependencies: dependencies,
                 coreDataModels: coreDataModels
             )
@@ -89,17 +100,29 @@ private extension ClipyModuleFactory {
             targets.append(makeTestTarget(for: module))
         }
 
-        return makeProject(module: module, targets: targets, hasTests: hasTests)
+        return makeProject(
+            module: module,
+            targets: targets,
+            hasTests: hasTests,
+            synthesizesBundleAccessors: synthesizesBundleAccessors,
+            synthesizesResourceAccessors: synthesizesResourceAccessors
+        )
     }
 
     static func makeProject(
         module: some ClipyModuleIdentifiable,
         targets: [Target],
-        hasTests: Bool
+        hasTests: Bool,
+        synthesizesBundleAccessors: Bool = true,
+        synthesizesResourceAccessors: Bool = true
     ) -> Project {
         Project(
             name: module.name,
-            options: .options(automaticSchemesOptions: .disabled),
+            options: .options(
+                automaticSchemesOptions: .disabled,
+                disableBundleAccessors: !synthesizesBundleAccessors,
+                disableSynthesizedResourceAccessors: !synthesizesResourceAccessors
+            ),
             targets: targets,
             schemes: [makeScheme(name: module.name, hasTests: hasTests)]
         )

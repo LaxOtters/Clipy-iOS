@@ -48,6 +48,7 @@ extension AppModule: ClipyModuleIdentifiable {
 public enum CoreModule {
     case coreDomain
     case corePersistence
+    case coreDesignSystem
 }
 
 extension CoreModule: ClipyModuleIdentifiable {
@@ -57,6 +58,8 @@ extension CoreModule: ClipyModuleIdentifiable {
             return "CoreDomain"
         case .corePersistence:
             return "CorePersistence"
+        case .coreDesignSystem:
+            return "CoreDesignSystem"
         }
     }
 
@@ -66,6 +69,8 @@ extension CoreModule: ClipyModuleIdentifiable {
             return "core-domain"
         case .corePersistence:
             return "core-persistence"
+        case .coreDesignSystem:
+            return "core-design-system"
         }
     }
 }
