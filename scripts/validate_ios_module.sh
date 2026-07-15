@@ -12,6 +12,7 @@ SUPPORTED_SCHEMES=(
   "AppMain"
   "CoreDomain"
   "CorePersistence"
+  "CoreDesignSystem"
   "FeatureSession"
 )
 
