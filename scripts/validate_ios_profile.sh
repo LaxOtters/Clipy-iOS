@@ -62,6 +62,9 @@ PROJECT_SETUP_SCHEMES=(
   "CoreDesignSystem"
   "FeatureSession"
 )
+RUNTIME_CONTRACT_TEST_SCHEMES=(
+  "CoreDesignSystem"
+)
 
 # PLAN 배열은 dry-run과 실제 실행이 함께 쓰는 command 목록입니다.
 # 입력을 어떻게 받았든 최종 검증 순서는 이 배열만 봅니다.
@@ -91,6 +94,18 @@ add_build_step() {
   done
 
   PLAN+=("$entry")
+}
+
+# 특정 module step만 runtime contract test로 올릴 때 씁니다.
+# profile 전체 mode는 그대로 두어 AppMain과 다른 module의 build-only 비용을 유지합니다.
+add_build_step_with_mode() {
+  local description="$1"
+  local mode="$2"
+  local command="$3"
+  local arg1="${4:-}"
+  local arg2="${5:-}"
+
+  PLAN+=("build-script-mode|${description}|${command}|${arg1}|${arg2}|${mode}")
 }
 
 add_function_step() {
@@ -157,13 +172,35 @@ require_validation_schemes() {
   check_validation_schemes
 }
 
+requires_runtime_contract_test() {
+  local candidate="$1"
+  local scheme
+
+  for scheme in "${RUNTIME_CONTRACT_TEST_SCHEMES[@]}"; do
+    if [[ "$scheme" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 add_module_steps() {
   local scheme
 
   require_validation_schemes
 
   for scheme in "${VALIDATION_SCHEMES[@]}"; do
-    add_build_step "Module ${scheme}" "$ROOT_DIR/scripts/validate_ios_module.sh" "$scheme"
+    if requires_runtime_contract_test "$scheme" && [[ "$CLIPY_IOS_VALIDATION_MODE" == "build-for-testing" ]]; then
+      # compile만으로 확인할 수 없는 runtime contract가 있는 module만 정책 목록에 두고 simulator test로 올립니다.
+      add_build_step_with_mode \
+        "Module ${scheme} contract test" \
+        "test" \
+        "$ROOT_DIR/scripts/validate_ios_module.sh" \
+        "$scheme"
+    else
+      add_build_step "Module ${scheme}" "$ROOT_DIR/scripts/validate_ios_module.sh" "$scheme"
+    fi
   done
 }
 
@@ -325,6 +362,7 @@ print_plan() {
   local description
   local index
   local kind
+  local step_mode
 
   # dry-run도 같은 PLAN을 보므로 build 없이 실제 검증 순서를 확인할 수 있습니다.
   echo "Validation profile: ${PROFILE}"
@@ -336,9 +374,12 @@ print_plan() {
   fi
   echo "Validation plan:"
   for index in "${!PLAN[@]}"; do
-    IFS='|' read -r kind description command arg1 arg2 <<< "${PLAN[$index]}"
-    if [[ "$kind" == "script" || "$kind" == "build-script" ]]; then
+    IFS='|' read -r kind description command arg1 arg2 step_mode <<< "${PLAN[$index]}"
+    if [[ "$kind" == "script" || "$kind" == "build-script" || "$kind" == "build-script-mode" ]]; then
       command="$(format_command "$command" ${arg1:+"$arg1"} ${arg2:+"$arg2"})"
+      if [[ "$kind" == "build-script-mode" ]]; then
+        command="CLIPY_IOS_VALIDATION_MODE=$(printf '%q' "$step_mode") ${command}"
+      fi
     fi
     printf '  %d. %s: %s\n' "$((index + 1))" "$description" "$command"
   done
@@ -352,7 +393,7 @@ plan_has_build_step() {
   # docs-only처럼 build를 생략하는 profile에서 Tuist 비용을 쓰지 않기 위해서입니다.
   for index in "${!PLAN[@]}"; do
     IFS='|' read -r kind _ <<< "${PLAN[$index]}"
-    if [[ "$kind" == "build-script" ]]; then
+    if [[ "$kind" == "build-script" || "$kind" == "build-script-mode" ]]; then
       return 0
     fi
   done
@@ -367,24 +408,31 @@ execute_plan() {
   local index
   local kind
   local command
+  local step_mode
   local tuist_prepared="0"
 
   # 정적 정책 검사가 실패하면 generate 비용을 쓰기 전에 멈춥니다.
   # 첫 build-script 직전에만 workspace를 만들고 이후 build step은 같은 profile 안에서 재사용합니다.
   for index in "${!PLAN[@]}"; do
-    IFS='|' read -r kind description command arg1 arg2 <<< "${PLAN[$index]}"
+    IFS='|' read -r kind description command arg1 arg2 step_mode <<< "${PLAN[$index]}"
     echo "==> ${description}"
     if [[ "$kind" == "function" ]]; then
       # function step은 docs-only나 YAML syntax처럼 별도 script가 필요 없는 검사만 둡니다.
       "$command"
     else
-      if [[ "$kind" == "build-script" && "$tuist_prepared" != "1" ]]; then
+      if [[ ("$kind" == "build-script" || "$kind" == "build-script-mode") && "$tuist_prepared" != "1" ]]; then
         prepare_tuist_workspace
         # 방금 만든 workspace를 같은 profile 안에서만 재사용하게 하는 내부 신호입니다.
         export CLIPY_IOS_SKIP_TUIST_PREP=1
         tuist_prepared="1"
       fi
-      run_command "$command" ${arg1:+"$arg1"} ${arg2:+"$arg2"}
+      if [[ "$kind" == "build-script-mode" ]]; then
+        echo "+ CLIPY_IOS_VALIDATION_MODE=$(printf '%q' "$step_mode") $(format_command "$command" ${arg1:+"$arg1"} ${arg2:+"$arg2"})"
+        CLIPY_IOS_VALIDATION_MODE="$step_mode" \
+          "$command" ${arg1:+"$arg1"} ${arg2:+"$arg2"}
+      else
+        run_command "$command" ${arg1:+"$arg1"} ${arg2:+"$arg2"}
+      fi
     fi
   done
 }
