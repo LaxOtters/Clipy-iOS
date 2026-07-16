@@ -59,6 +59,7 @@ VALIDATION_SCHEMES=()
 PROJECT_SETUP_SCHEMES=(
   "CoreDomain"
   "CorePersistence"
+  "CoreDesignSystem"
   "FeatureSession"
 )
 
@@ -278,9 +279,12 @@ plan_for_profile() {
       add_project_setup_module_steps
       ;;
     ci)
-      # GitHub Actions나 validation script 변경은 YAML과 AppMain 조립을 같이 봅니다.
+      # GitHub Actions나 validation script 변경은 YAML과 AppMain 조립을 보고, 검증 scheme이 연결된 AREA가 있으면 해당 scheme도 같이 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
       add_function_step "GitHub workflow YAML syntax" validate_workflow_yaml
+      if [[ -n "$SCHEMES_RAW" ]]; then
+        add_module_steps
+      fi
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       ;;
     app-main)

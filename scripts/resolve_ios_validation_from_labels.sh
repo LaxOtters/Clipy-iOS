@@ -82,7 +82,7 @@ is_supported_type() {
 
 is_supported_area() {
   case "$1" in
-    "AREA | Docs"|"AREA | Project Setup"|"AREA | CI"|"AREA | AppMain"|"AREA | CoreDomain"|"AREA | CorePersistence"|"AREA | FeatureSession")
+    "AREA | Docs"|"AREA | Project Setup"|"AREA | CI"|"AREA | AppMain"|"AREA | CoreDomain"|"AREA | CorePersistence"|"AREA | UI System"|"AREA | FeatureSession")
       return 0
       ;;
     *)
@@ -111,6 +111,9 @@ append_scheme_for_area() {
       ;;
     "AREA | CorePersistence")
       SCHEMES+=("CorePersistence")
+      ;;
+    "AREA | UI System")
+      SCHEMES+=("CoreDesignSystem")
       ;;
     "AREA | FeatureSession")
       SCHEMES+=("FeatureSession")
@@ -195,6 +198,10 @@ PROFILE=""
 SCHEMES=()
 SCHEMES_OUTPUT=""
 
+for area_label in "${AREA_LABELS[@]}"; do
+  append_scheme_for_area "$area_label"
+done
+
 # docs-only는 build를 생략하는 위험한 profile입니다.
 # TYPE과 AREA가 모두 문서 변경을 가리킬 때만 허용하고, 다른 AREA가 섞이면 바로 실패시킵니다.
 if [[ "$TYPE_LABEL" == "TYPE | Docs" ]]; then
@@ -210,16 +217,15 @@ elif has_area "AREA | Docs"; then
   echo "AREA | Docs requires TYPE | Docs." >&2
   exit 2
 elif has_area "AREA | CI"; then
-  # CI label이 섞인 PR은 workflow/YAML 검증을 빼지 않도록 CI profile을 우선합니다.
+  # CI label이 섞인 PR은 CI 검증을 유지하면서 함께 지정한 검증 scheme도 같은 plan에서 확인합니다.
   PROFILE="ci"
+  if ((${#SCHEMES[@]} > 0)); then
+    SCHEMES_OUTPUT="${SCHEMES[*]}"
+  fi
 elif has_area "AREA | Project Setup"; then
   PROFILE="project-setup"
 else
-  for area_label in "${AREA_LABELS[@]}"; do
-    append_scheme_for_area "$area_label"
-  done
-
-  # module AREA는 AppMain 조립까지 봐야 하므로 integration profile로 보냅니다.
+  # 검증 scheme이 연결된 AREA는 AppMain 조립까지 봐야 하므로 integration profile로 보냅니다.
   if ((${#SCHEMES[@]} > 0)); then
     PROFILE="integration"
     SCHEMES_OUTPUT="${SCHEMES[*]}"
