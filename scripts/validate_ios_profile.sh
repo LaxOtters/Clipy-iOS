@@ -235,7 +235,7 @@ read_changed_files() {
 is_docs_only_path() {
   local path="$1"
 
-  # docs-only는 공개 문서와 GitHub template 변경만 허용합니다.
+  # docs-only는 문서와 GitHub template 변경만 허용합니다.
   # script, Tuist manifest, source가 섞이면 build를 생략하면 안 됩니다.
   case "$path" in
     Docs/*|README.md|Docs.md|AGENTS.md|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE/*|.github/pull_request_template.md)
@@ -343,7 +343,7 @@ plan_for_profile() {
       add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
       ;;
     docs-only)
-      # docs-only는 build를 생략하므로 changed files가 public docs/template 범위인지 먼저 봅니다.
+      # docs-only는 build를 생략하므로 changed files가 문서와 GitHub template 범위인지 먼저 봅니다.
       # 코드성 파일이 하나라도 섞이면 이 profile을 쓰지 않습니다.
       add_function_step "Docs-only changed files check" validate_docs_only_changed_files
       add_script_step "Tracked generated artifact preflight" "$ROOT_DIR/scripts/validate_tuist_foundation.sh" "--generated-artifacts-only"
