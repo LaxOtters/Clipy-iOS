@@ -42,7 +42,8 @@ CLIPY_IOS_VALIDATION_MODE=test \
 작업 범위가 명확하면 profile을 골라 필요한 검증만 실행할 수 있습니다.
 profile은 검증 방식과 비용을 정하고, module 대상은 `CLIPY_IOS_VALIDATION_SCHEMES`로 넘깁니다.
 profile router는 기본으로 `build-for-testing`을 사용합니다.
-simulator에서 test까지 실행해야 할 때만 `CLIPY_IOS_VALIDATION_MODE=test`를 명시합니다.
+일반 profile에서 simulator test까지 실행하려면 `CLIPY_IOS_VALIDATION_MODE=test`를 명시합니다.
+다만 `CoreDesignSystem`을 직접 선택한 기본 profile은 font와 resource 계약을 확인하기 위해 해당 module test만 실행합니다.
 build가 필요한 profile은 `tuist install`과 `tuist generate`를 한 번 실행한 뒤, 선택된 scheme 검증을 이어서 실행합니다.
 
 ```sh
@@ -87,7 +88,7 @@ CLIPY_IOS_CHANGED_FILES=$'Docs/Open/SETUP.md\nDocs/Open/PROJECT_STRUCTURE.md' \
   ./scripts/validate_ios_profile.sh
 ```
 
-`docs-only`는 iOS build를 생략하는 대신, 입력된 파일이 `Docs/Open`, root 문서, GitHub template 계열인지 확인합니다.
+`docs-only`는 iOS build를 생략하는 대신, 입력된 파일이 문서나 GitHub template인지 확인합니다.
 generated artifact 확인은 tracked file 기준의 preflight입니다.
 PR을 올리기 전에는 `git status --short`로 untracked 생성물이 섞였는지도 따로 봅니다.
 
@@ -109,22 +110,24 @@ xcodebuild test \
 GitHub Actions에서는 `iOS Baseline` workflow가 PR label을 보고 validation profile을 고릅니다.
 workflow가 label과 changed files를 준비하고, 실제 검증은 local과 같은 `./scripts/validate_ios_profile.sh`가 실행합니다.
 CI도 기본 mode는 `build-for-testing`입니다.
-simulator를 띄우는 full test는 필요한 PR에서 별도로 확인합니다.
+`CoreDesignSystem`이 직접 선택되면 해당 module의 contract test만 simulator에서 실행하고, 다른 module과 AppMain은 `build-for-testing`을 유지합니다.
+그 밖의 simulator test는 필요한 PR에서 별도로 확인합니다.
 
 | PR label | CI profile | Scheme |
 | --- | --- | --- |
 | `TYPE \| Docs` + `AREA \| Docs` | `docs-only` | 없음 |
 | `AREA \| Project Setup` | `project-setup` | router 내부 기준 |
-| `AREA \| CI` | `ci` | 없음 |
+| `AREA \| CI` | `ci` | 함께 지정한 검증 scheme |
 | `AREA \| AppMain` | `app-main` | 없음 |
 | `AREA \| CoreDomain` | `integration` | `CoreDomain` |
 | `AREA \| CorePersistence` | `integration` | `CorePersistence` |
+| `AREA \| UI System` | `integration` | `CoreDesignSystem` |
 | `AREA \| FeatureSession` | `integration` | `FeatureSession` |
 
-module 영역은 CI에서 `module`이 아니라 `integration`으로 확인합니다.
+검증 scheme이 정해진 AREA는 CI에서 `module`이 아니라 `integration`으로 확인합니다.
 해당 module만 build되는지보다 AppMain 조립까지 같이 보는 편이 안전하기 때문입니다.
 label이 없거나 지원하지 않는 조합이면 CI는 추정하지 않고 실패합니다.
-`AREA | CI`가 다른 AREA와 같이 있으면 `ci` profile을 우선합니다.
+`AREA | CI`가 검증 scheme이 있는 AREA와 같이 있으면 `ci` profile에서 YAML·AppMain 검증과 해당 module 검증을 같이 실행합니다.
 manual dispatch에서 `docs-only`를 고를 때는 changed files 입력도 같이 넘겨야 합니다.
 
 label mapping만 로컬에서 확인할 수도 있습니다.

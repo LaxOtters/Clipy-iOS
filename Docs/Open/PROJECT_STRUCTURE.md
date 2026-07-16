@@ -33,6 +33,16 @@ Clipy-iOS/
       Resources/
       Sources/
       Tests/
+    CoreDesignSystem/
+      Project.swift
+      Resources/
+        Fonts/
+        Licenses/
+      Sources/
+        Color/
+        Resource/
+        Typography/
+      Tests/
 ```
 
 ## 현재 module
@@ -43,6 +53,7 @@ Clipy-iOS/
 | `FeatureSession` | Session 화면 진입, UIKit shell, WebView wrapper |
 | `CoreDomain` | Session, Item, Decision, Capture, SessionSnapshot와 repository contract |
 | `CorePersistence` | CoreData 기반 local 저장 구조, entity mapping, repository 구현 |
+| `CoreDesignSystem` | 공용 UIKit typography, color Foundation, Pretendard font resource |
 
 module이 늘어나도 기본 구조는 같습니다.
 각 module은 자기 `Project.swift`와 `Sources/`를 가집니다.
@@ -76,12 +87,15 @@ Module은 화면 수가 아니라 책임 경계를 기준으로 늘립니다.
 ```plaintext
 AppMain -> FeatureSession -> CoreDomain
 AppMain -> CorePersistence -> CoreDomain
+AppMain -> CoreDesignSystem
+FeatureSession -> CoreDesignSystem
 ```
 
 `AppMain`은 app entry point와 composition root를 맡습니다.
 `FeatureSession`은 Session 화면과 WebView wrapper를 맡습니다.
 `CorePersistence`는 `CoreDomain`의 repository contract를 CoreData로 구현합니다.
 `CoreDomain`은 저장소 구현, WebView, UIKit detail을 모릅니다.
+`CoreDesignSystem`은 다른 Core module에 의존하지 않고 UIKit에서 사용할 typography와 color API를 제공합니다.
 
 Feature module이 생기면 기본 의존 방향은 아래처럼 둡니다.
 
@@ -113,6 +127,7 @@ module 하나만 확인할 때는 아래 command를 씁니다.
 
 ```bash
 ./scripts/validate_ios_module.sh CoreDomain
+./scripts/validate_ios_module.sh CoreDesignSystem
 ./scripts/validate_ios_module.sh FeatureSession
 ```
 
@@ -190,6 +205,11 @@ Feature UI
 `CorePersistence`는 CoreData schema, entity mapping, `SessionRepository` 구현을 맡습니다.
 Persistence, WebView, cache 같은 platform detail은 Domain 안으로 들어오지 않습니다.
 
+`CoreDesignSystem`은 Figma에서 확인한 Light mode typography와 color 값을 UIKit API로 제공합니다.
+화면에 적용할 때는 component-scoped Style에서 `ClipyTypography`, `ClipyColor.Foundation`, `ClipyGradient.Foundation` 값을 매핑합니다.
+Feature가 Foundation token을 화면마다 직접 선택하지 않도록 해, Figma semantic이 도입되면 Style mapping만 바꿀 수 있게 둡니다.
+Pretendard font 파일과 등록 과정은 `CoreDesignSystem` 내부에서 관리하며, Feature가 bundle 경로나 font 파일 이름을 직접 알지 않습니다.
+
 Feature는 UIKit 화면, ViewController, ViewModel, 화면 action 처리를 맡습니다.
 Feature에서 local DB 구현체나 저장 schema를 직접 알지 않게 합니다.
 
@@ -205,7 +225,7 @@ Home은 세션 진입과 관리에 집중합니다.
 | 책임 | 예시 module |
 | --- | --- |
 | WebView, URL validation, web primitive | `CoreWeb` |
-| 공용 UIKit style/component | `CoreUI` |
+| 공용 UIKit component | `CoreDesignSystem` 확장 |
 | Home, session list, start/reopen entry flow | `FeatureHome` |
 | Session screen, bottom sheet, Decision surface | `FeatureSession` |
 
