@@ -9,7 +9,8 @@
 public enum ClipyDependencies {
     public static let appMain: [AppDependency] = [
         .feature(.featureSession),
-        .core(.corePersistence)
+        .core(.corePersistence),
+        .core(.coreDesignSystem)
     ]
 
     public static let coreDomain: [CoreDependency] = []
@@ -24,6 +25,7 @@ public enum ClipyDependencies {
         .external(.rxSwift),
         .external(.rxCocoa),
         .external(.rxRelay),
-        .core(.coreDomain)
+        .core(.coreDomain),
+        .core(.coreDesignSystem)
     ]
 }
