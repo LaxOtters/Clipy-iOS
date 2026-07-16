@@ -318,6 +318,7 @@ plan_for_profile() {
     ci)
       # GitHub Actions나 validation script 변경은 YAML과 AppMain 조립을 보고, 검증 scheme이 연결된 AREA가 있으면 해당 scheme도 같이 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
+      add_script_step "iOS validation routing contract" "$ROOT_DIR/scripts/validate_ios_routing.sh"
       add_function_step "GitHub workflow YAML syntax" validate_workflow_yaml
       if [[ -n "$SCHEMES_RAW" ]]; then
         add_module_steps
