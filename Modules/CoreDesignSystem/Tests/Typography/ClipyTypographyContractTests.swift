@@ -119,6 +119,20 @@ final class ClipyTypographyContractTests: XCTestCase {
         XCTAssertEqual(emptyLabel.font.fontName, "Pretendard-Medium")
         XCTAssertEqual(emptyLabel.attributedText?.string, "")
     }
+
+    func test_applyingTextStyle_withEmptyText_updatesExplicitColor_forLabelState() {
+        let label = UILabel()
+        label.textColor = .red
+
+        ClipyTypography.body1Medium.apply(
+            to: label,
+            text: "",
+            color: .green
+        )
+
+        XCTAssertEqual(label.attributedText?.string, "")
+        XCTAssertEqual(label.textColor, .green)
+    }
 }
 
 private typealias Typography = ClipyTypography

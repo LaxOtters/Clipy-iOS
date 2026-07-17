@@ -56,6 +56,9 @@ public struct ClipyTextStyle {
             alignment: textAlignment,
             lineBreakMode: lineBreakMode
         )
+        if let color {
+            label.textColor = color
+        }
         label.textAlignment = textAlignment
         label.lineBreakMode = lineBreakMode
     }
