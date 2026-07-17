@@ -135,6 +135,7 @@ assert_not_contains "$project_setup_plan" "CLIPY_IOS_VALIDATION_MODE=test" "Proj
 
 ci_only_plan="$(
   CLIPY_IOS_VALIDATION_PROFILE=ci \
+  CLIPY_IOS_VALIDATION_SCHEMES="" \
   CLIPY_IOS_VALIDATION_DRY_RUN=1 \
     "$ROOT_DIR/scripts/validate_ios_profile.sh"
 )"
