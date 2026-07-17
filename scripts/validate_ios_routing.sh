@@ -86,6 +86,7 @@ assert_contains "$ci_core_persistence_output" "CLIPY_IOS_VALIDATION_SCHEMES=Core
 ci_plan="$(
   CLIPY_IOS_VALIDATION_PROFILE=ci \
   CLIPY_IOS_VALIDATION_SCHEMES=CoreDesignSystem \
+  CLIPY_IOS_VALIDATION_MODE=build-for-testing \
   CLIPY_IOS_VALIDATION_DRY_RUN=1 \
     "$ROOT_DIR/scripts/validate_ios_profile.sh"
 )"
@@ -97,6 +98,7 @@ assert_contains "$ci_plan" "AppMain baseline" "CI + CoreDesignSystem plan"
 integration_plan="$(
   CLIPY_IOS_VALIDATION_PROFILE=integration \
   CLIPY_IOS_VALIDATION_SCHEMES=CoreDesignSystem \
+  CLIPY_IOS_VALIDATION_MODE=build-for-testing \
   CLIPY_IOS_VALIDATION_DRY_RUN=1 \
     "$ROOT_DIR/scripts/validate_ios_profile.sh"
 )"
@@ -126,6 +128,7 @@ assert_contains "$core_design_system_test_plan" "Module CoreDesignSystem" "CoreD
 
 project_setup_plan="$(
   CLIPY_IOS_VALIDATION_PROFILE=project-setup \
+  CLIPY_IOS_VALIDATION_MODE=build-for-testing \
   CLIPY_IOS_VALIDATION_DRY_RUN=1 \
     "$ROOT_DIR/scripts/validate_ios_profile.sh"
 )"
@@ -136,6 +139,7 @@ assert_not_contains "$project_setup_plan" "CLIPY_IOS_VALIDATION_MODE=test" "Proj
 ci_only_plan="$(
   CLIPY_IOS_VALIDATION_PROFILE=ci \
   CLIPY_IOS_VALIDATION_SCHEMES="" \
+  CLIPY_IOS_VALIDATION_MODE=build-for-testing \
   CLIPY_IOS_VALIDATION_DRY_RUN=1 \
     "$ROOT_DIR/scripts/validate_ios_profile.sh"
 )"
