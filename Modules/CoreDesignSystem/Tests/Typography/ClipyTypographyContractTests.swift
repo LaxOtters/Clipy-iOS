@@ -44,20 +44,34 @@ final class ClipyTypographyContractTests: XCTestCase {
         XCTAssertEqual(ClipyTypography.tag2Bold.letterSpacing, 0.6)
     }
 
-    func test_attributedString_usesClipyMetrics_withoutImplicitColorOrBaseline() {
-        let attributedText = Typography.body1Medium.attributedString("Clipy")
-        let attributes = attributedText.attributes(at: 0, effectiveRange: nil)
-        let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
+    func test_attributedString_centersFontMetrics_insideDesignLineHeight() {
+        let styles = [
+            Typography.heading4,
+            Typography.body1Medium,
+            Typography.body2Medium
+        ]
 
-        XCTAssertEqual(Set(attributes.keys), [.font, .kern, .paragraphStyle])
-        XCTAssertEqual((attributes[.font] as? UIFont)?.fontName, "Pretendard-Medium")
-        XCTAssertEqual((attributes[.kern] as? NSNumber)?.doubleValue, 0)
-        XCTAssertEqual(paragraphStyle?.minimumLineHeight, 24)
-        XCTAssertEqual(paragraphStyle?.maximumLineHeight, 24)
-        XCTAssertEqual(paragraphStyle?.alignment, .natural)
-        XCTAssertEqual(paragraphStyle?.lineBreakMode, .byWordWrapping)
-        XCTAssertNil(attributes[.foregroundColor])
-        XCTAssertNil(attributes[.baselineOffset])
+        styles.forEach { style in
+            let attributedText = style.attributedString("Clipy")
+            let attributes = attributedText.attributes(at: 0, effectiveRange: nil)
+            let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
+            let expectedBaselineOffset = (style.lineHeight - style.font.lineHeight) / 2
+            let baselineOffset = (attributes[.baselineOffset] as? NSNumber).map { CGFloat($0.doubleValue) }
+
+            XCTAssertEqual(Set(attributes.keys), [.font, .kern, .paragraphStyle, .baselineOffset])
+            XCTAssertEqual(attributes[.font] as? UIFont, style.font)
+            XCTAssertEqual((attributes[.kern] as? NSNumber)?.doubleValue, style.letterSpacing)
+            XCTAssertEqual(paragraphStyle?.minimumLineHeight, style.lineHeight)
+            XCTAssertEqual(paragraphStyle?.maximumLineHeight, style.lineHeight)
+            XCTAssertEqual(paragraphStyle?.alignment, .natural)
+            XCTAssertEqual(paragraphStyle?.lineBreakMode, .byWordWrapping)
+            XCTAssertNil(attributes[.foregroundColor])
+            XCTAssertEqual(
+                baselineOffset ?? .nan,
+                expectedBaselineOffset,
+                accuracy: 0.000001
+            )
+        }
     }
 
     func test_applyingTextStyle_rebuildsExpectedAttributes_andPreservesLabelInputs() {
