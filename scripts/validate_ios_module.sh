@@ -26,6 +26,7 @@ Supported schemes:
 
 Environment:
   CLIPY_IOS_VALIDATION_MODE   test | build-for-testing | build (default: build-for-testing)
+  CLIPY_IOS_XCODEBUILD_CONFIGURATION optional xcodebuild configuration, such as Release
   CLIPY_IOS_DESTINATION       optional xcodebuild destination override
   CLIPY_IOS_SIMULATOR_NAME    preferred simulator name for test mode
 USAGE
