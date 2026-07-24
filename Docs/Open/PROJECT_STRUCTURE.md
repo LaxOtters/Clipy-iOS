@@ -16,6 +16,17 @@ Clipy-iOS/
       Project.swift
       Sources/
       Tests/
+    FeatureHome/
+      Project.swift
+      Resources/
+        Assets.xcassets/
+      Sources/
+        Asset/
+        Interface/
+        Home/
+          Views/
+      Tests/
+        Home/
     FeatureSession/
       Project.swift
       Sources/
@@ -60,6 +71,7 @@ Clipy-iOS/
 | Module | 책임 |
 | --- | --- |
 | `AppMain` | app entry point, scene lifecycle, app 조립 |
+| `FeatureHome` | First Use Home, 새 Session 시작 요청 상태와 route event |
 | `FeatureSession` | Session 화면 진입, UIKit shell, WebView wrapper |
 | `CoreDomain` | Session, Item, Decision, Capture, SessionSnapshot와 repository contract |
 | `CorePersistence` | CoreData 기반 local 저장 구조, entity mapping, repository 구현 |
@@ -95,8 +107,10 @@ Module은 화면 수가 아니라 책임 경계를 기준으로 늘립니다.
 현재 module 의존은 아래처럼 둡니다.
 
 ```plaintext
+AppMain -> FeatureHome -> CoreDesignSystem
 AppMain -> FeatureSession -> CoreDomain
 AppMain -> CorePersistence -> CoreDomain
+AppMain -> CoreDomain
 AppMain -> CoreDesignSystem
 FeatureSession -> CoreDesignSystem
 ```
@@ -138,6 +152,7 @@ module 하나만 확인할 때는 아래 command를 씁니다.
 ```bash
 ./scripts/validate_ios_module.sh CoreDomain
 ./scripts/validate_ios_module.sh CoreDesignSystem
+./scripts/validate_ios_module.sh FeatureHome
 ./scripts/validate_ios_module.sh FeatureSession
 ```
 
@@ -181,8 +196,7 @@ Feature는 container를 직접 들고 다니지 않습니다.
 
 ```swift
 let viewModel = HomeViewModel(
-    startNewSession: startNewSessionUseCase,
-    loadSessions: loadSessionsUseCase
+    startNewSession: startNewSessionUseCase
 )
 ```
 

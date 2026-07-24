@@ -122,6 +122,7 @@ CI도 기본 mode는 `build-for-testing`입니다.
 | `AREA \| CoreDomain` | `integration` | `CoreDomain` |
 | `AREA \| CorePersistence` | `integration` | `CorePersistence` |
 | `AREA \| UI System` | `integration` | `CoreDesignSystem` |
+| `AREA \| FeatureHome` | `integration` | `FeatureHome` |
 | `AREA \| FeatureSession` | `integration` | `FeatureSession` |
 
 검증 scheme이 정해진 AREA는 CI에서 `module`이 아니라 `integration`으로 확인합니다.
