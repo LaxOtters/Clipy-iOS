@@ -13,6 +13,7 @@ public enum ClipyIcon {
     public static let share = image(named: "clipy_icon_share")
     public static let edit = image(named: "clipy_icon_edit")
     public static let delete = image(named: "clipy_icon_delete")
+    public static let rightArrow = image(named: "clipy_icon_right_arrow")
 }
 
 private extension ClipyIcon {

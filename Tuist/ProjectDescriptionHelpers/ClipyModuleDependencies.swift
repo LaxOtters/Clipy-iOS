@@ -21,6 +21,13 @@ public enum ClipyDependencies {
 
     public static let coreDesignSystem: [CoreDependency] = []
 
+    public static let featureHome: [FeatureDependency] = [
+        .external(.rxSwift),
+        .external(.rxCocoa),
+        .external(.rxRelay),
+        .core(.coreDesignSystem)
+    ]
+
     public static let featureSession: [FeatureDependency] = [
         .external(.rxSwift),
         .external(.rxCocoa),
