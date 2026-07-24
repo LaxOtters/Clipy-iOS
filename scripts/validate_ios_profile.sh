@@ -61,6 +61,7 @@ PROJECT_SETUP_SCHEMES=(
   "CoreDomain"
   "CorePersistence"
   "CoreDesignSystem"
+  "FeatureHome"
   "FeatureSession"
 )
 RUNTIME_CONTRACT_TEST_SCHEMES=(
@@ -303,7 +304,8 @@ prepare_tuist_workspace() {
   # 로컬에서 오래된 workspace를 재사용하는 용도로 쓰지 않습니다.
   echo "Preparing Tuist workspace..."
   mise exec -- tuist install
-  mise exec -- tuist generate
+  # profile 경로도 baseline과 동일하게 workspace만 생성하고 Xcode는 열지 않습니다.
+  mise exec -- tuist generate --no-open
 }
 
 plan_for_profile() {

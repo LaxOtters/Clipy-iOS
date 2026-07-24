@@ -82,7 +82,7 @@ is_supported_type() {
 
 is_supported_area() {
   case "$1" in
-    "AREA | Docs"|"AREA | Project Setup"|"AREA | CI"|"AREA | AppMain"|"AREA | CoreDomain"|"AREA | CorePersistence"|"AREA | UI System"|"AREA | FeatureSession")
+    "AREA | Docs"|"AREA | Project Setup"|"AREA | CI"|"AREA | AppMain"|"AREA | CoreDomain"|"AREA | CorePersistence"|"AREA | UI System"|"AREA | FeatureHome"|"AREA | FeatureSession")
       return 0
       ;;
     *)
@@ -114,6 +114,9 @@ append_scheme_for_area() {
       ;;
     "AREA | UI System")
       SCHEMES+=("CoreDesignSystem")
+      ;;
+    "AREA | FeatureHome")
+      SCHEMES+=("FeatureHome")
       ;;
     "AREA | FeatureSession")
       SCHEMES+=("FeatureSession")

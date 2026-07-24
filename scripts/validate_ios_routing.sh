@@ -63,6 +63,10 @@ ui_system_output="$(resolve_labels $'TYPE | Feature\nAREA | UI System')"
 assert_contains "$ui_system_output" "CLIPY_IOS_VALIDATION_PROFILE=integration" "UI System routing"
 assert_contains "$ui_system_output" "CLIPY_IOS_VALIDATION_SCHEMES=CoreDesignSystem" "UI System routing"
 
+feature_home_output="$(resolve_labels $'TYPE | Feature\nAREA | FeatureHome')"
+assert_contains "$feature_home_output" "CLIPY_IOS_VALIDATION_PROFILE=integration" "FeatureHome routing"
+assert_contains "$feature_home_output" "CLIPY_IOS_VALIDATION_SCHEMES=FeatureHome" "FeatureHome routing"
+
 ci_only_output="$(resolve_labels $'TYPE | Chore\nAREA | CI')"
 assert_contains "$ci_only_output" "CLIPY_IOS_VALIDATION_PROFILE=ci" "CI-only routing"
 assert_exact_line "$ci_only_output" "CLIPY_IOS_VALIDATION_SCHEMES=" "CI-only routing"
