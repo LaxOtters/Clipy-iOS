@@ -32,6 +32,7 @@ Inputs:
   CLIPY_IOS_CHANGED_FILES_FILE   optional file containing newline-separated paths
   CLIPY_IOS_VALIDATION_DRY_RUN   set to 1 to print the command plan only
   CLIPY_IOS_VALIDATION_MODE      build-for-testing | build | test (default: build-for-testing)
+  CLIPY_IOS_XCODEBUILD_CONFIGURATION optional xcodebuild configuration, such as Release
 USAGE
 }
 

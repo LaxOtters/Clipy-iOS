@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 SCHEME="${CLIPY_IOS_SCHEME:-AppMain}"
 WORKSPACE="${CLIPY_IOS_WORKSPACE:-Clipy.xcworkspace}"
 MODE="${CLIPY_IOS_VALIDATION_MODE:-build-for-testing}"
+CONFIGURATION="${CLIPY_IOS_XCODEBUILD_CONFIGURATION:-}"
 DESTINATION="${CLIPY_IOS_DESTINATION:-}"
 SIMULATOR_NAME="${CLIPY_IOS_SIMULATOR_NAME:-iPhone 17 Pro}"
 # validate_ios_profile.sh가 방금 만든 workspace를 재사용할 때만 1로 둡니다.
@@ -56,6 +57,18 @@ if [[ "${CLIPY_XCODEBUILD_QUIET:-1}" == "1" ]]; then
   XCODEBUILD_ARGS+=("-quiet")
 fi
 
+# Release fallback처럼 build configuration 자체가 검증 계약일 때만 명시적으로 전달합니다.
+# 빈 값이면 Xcode scheme의 기본 configuration을 그대로 사용합니다.
+if [[ -n "$CONFIGURATION" ]]; then
+  XCODEBUILD_ARGS+=("-configuration" "$CONFIGURATION")
+fi
+
+# Release configuration에서도 @testable contract test를 실행할 수 있게 test build에만
+# testability를 켭니다. DEBUG compilation condition은 configuration을 그대로 따릅니다.
+if [[ "$MODE" == "test" && "$CONFIGURATION" == "Release" ]]; then
+  XCODEBUILD_ARGS+=("ENABLE_TESTABILITY=YES")
+fi
+
 # mode가 simulator 비용을 결정합니다.
 # profile 실행과 직접 실행이 같은 값을 쓰므로 새 mode는 양쪽에서 같이 다뤄야 합니다.
 case "$MODE" in
@@ -99,6 +112,10 @@ echo "Tuist:"
 mise exec -- tuist version
 
 echo "Validation mode: ${MODE}"
+echo "Build configuration: ${CONFIGURATION:-scheme default}"
+if [[ "$MODE" == "test" && "$CONFIGURATION" == "Release" ]]; then
+  echo "Testability override: ENABLE_TESTABILITY=YES"
+fi
 echo "Using destination: ${DESTINATION}"
 
 # 직접 실행은 Tuist graph를 다시 만들고, profile 안의 하위 실행만 재사용합니다.

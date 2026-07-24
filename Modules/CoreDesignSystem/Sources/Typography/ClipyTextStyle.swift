@@ -7,6 +7,8 @@
 
 import UIKit
 
+/// Clipy의 공통 Typography를 UIKit text에 적용하는 스타일입니다.
+/// 텍스트의 정렬과 컨테이너 배치는 각 UIKit 컴포넌트가 정합니다.
 public struct ClipyTextStyle {
     public let font: UIFont
     public let lineHeight: CGFloat
@@ -29,7 +31,9 @@ public struct ClipyTextStyle {
         var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .kern: letterSpacing,
-            .paragraphStyle: paragraphStyle
+            .paragraphStyle: paragraphStyle,
+            // 디자인 lineHeight의 남는 높이를 font metric 위아래로 나누며, glyph별 시각 보정은 하지 않습니다.
+            .baselineOffset: (lineHeight - font.lineHeight) / 2
         ]
         attributes[.foregroundColor] = color
 
