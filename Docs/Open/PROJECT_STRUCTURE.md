@@ -14,8 +14,19 @@ Clipy-iOS/
   Modules/
     AppMain/
       Project.swift
+      Resources/
+        Assets.xcassets/
+          SplashBackground.imageset/
+        LaunchScreen.storyboard
+        clipy_logo_animation.json
       Sources/
+        Application/
+        Composition/
+        Splash/
       Tests/
+        Application/
+        Composition/
+        Splash/
     FeatureHome/
       Project.swift
       Resources/
@@ -70,7 +81,7 @@ Clipy-iOS/
 
 | Module | 책임 |
 | --- | --- |
-| `AppMain` | app entry point, scene lifecycle, app 조립 |
+| `AppMain` | app entry point, system launch·runtime Splash, scene lifecycle, app 조립 |
 | `FeatureHome` | First Use Home, 새 Session 시작 요청 상태와 route event |
 | `FeatureSession` | Session 화면 진입, UIKit shell, WebView wrapper |
 | `CoreDomain` | Session, Item, Decision, Capture, SessionSnapshot와 repository contract |
@@ -116,6 +127,7 @@ FeatureSession -> CoreDesignSystem
 ```
 
 `AppMain`은 app entry point와 composition root를 맡습니다.
+system launch와 runtime Splash가 함께 쓰는 배경 이미지, Lottie resource, process 안에서 한 번만 재생하는 기준도 여기에서 관리합니다. Splash가 끝나면 기존 Home composer가 만든 화면을 root로 교체합니다. 이 책임 때문에 별도 Splash 모듈을 만들지 않았습니다.
 `FeatureSession`은 Session 화면과 WebView wrapper를 맡습니다.
 `CorePersistence`는 `CoreDomain`의 repository contract를 CoreData로 구현합니다.
 `CoreDomain`은 저장소 구현, WebView, UIKit detail을 모릅니다.

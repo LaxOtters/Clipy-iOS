@@ -107,11 +107,16 @@ UIKit subview가 실제로 붙어 있는지까지 unit test로 고정하지 않�
 
 UIKit 화면 코드는 가능한 한 얇게 둡니다.
 ViewController는 navigation, binding, rendering에 집중합니다.
-비교, 결정, 복원 같은 규칙은 Domain, State Machine, ViewModel 쪽으로 옮깁니다.
+비교, 결정, 복원 같은 규칙은 먼저 그 동작을 소유하는 Domain이나 ViewModel로 옮깁니다.
+이벤트 순서와 interruption 자체가 규칙이면 해당 소유자 내부의 상태머신으로 분리합니다.
 
 좋은 방향은 ViewController가 직접 판단하지 않는 구조입니다.
 ViewController는 ViewModel state를 렌더링합니다.
 WebView, Bottom Sheet, navigation은 직접 unit test하기보다 그 상태를 결정하는 policy를 테스트합니다.
+
+ViewModel 테스트는 화면 입력 뒤 렌더링 상태, 라우트, 오류와 외부 작업 결과를 봅니다.
+상태머신 테스트는 허용되는 상태 전환, 중복 이벤트, interruption 규칙만 봅니다.
+ViewModel이 상태머신을 사용하더라도 같은 전환 규칙을 양쪽 테스트에서 반복하지 않습니다.
 
 화면 테스트는 아래 순서로 판단합니다.
 
