@@ -12,6 +12,7 @@ public enum ClipyModuleFactory {
     public static func makeApp(
         module: AppModule,
         dependencies: [AppDependency] = [],
+        resources: ResourceFileElements? = nil,
         hasTests: Bool = true
     ) -> Project {
         var targets: [Target] = [
@@ -23,7 +24,14 @@ public enum ClipyModuleFactory {
                 deploymentTargets: ClipyProjectConfig.deploymentTargets,
                 infoPlist: .extendingDefault(with: ClipyProjectConfig.baseInfoPlist),
                 sources: ["\(ClipyProjectConfig.sourcesDirectory)/**"],
-                dependencies: dependencies.map(\.targetDependency)
+                resources: resources,
+                dependencies: dependencies.map(\.targetDependency),
+                settings: .settings(
+                    base: [
+                        "ASSETCATALOG_COMPILER_APPICON_NAME": "",
+                        "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": ""
+                    ]
+                )
             )
         ]
 

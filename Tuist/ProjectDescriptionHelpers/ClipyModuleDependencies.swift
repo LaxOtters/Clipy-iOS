@@ -8,6 +8,7 @@
 /// 현재 module graph를 한 곳에서 읽기 위한 dependency map입니다.
 public enum ClipyDependencies {
     public static let appMain: [AppDependency] = [
+        .external(.lottie),
         .feature(.featureHome),
         .feature(.featureSession),
         .core(.coreDomain),

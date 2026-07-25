@@ -25,6 +25,7 @@ let packageSettings = PackageSettings(
 let package = Package(
     name: "ClipyDependencies",
     dependencies: [
-        .package(url: "https://github.com/ReactiveX/RxSwift.git", from: "6.10.2")
+        .package(url: "https://github.com/ReactiveX/RxSwift.git", from: "6.10.2"),
+        .package(url: "https://github.com/airbnb/lottie-spm.git", from: "4.6.1")
     ]
 )

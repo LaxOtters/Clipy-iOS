@@ -7,12 +7,15 @@
 
 /// Tuist Package dependency를 manifest에서 raw string 없이 고르기 위한 enum입니다.
 public enum ExternalDependency {
+    case lottie
     case rxSwift
     case rxCocoa
     case rxRelay
 
     var packageName: String {
         switch self {
+        case .lottie:
+            return "Lottie"
         case .rxSwift:
             return "RxSwift"
         case .rxCocoa:
