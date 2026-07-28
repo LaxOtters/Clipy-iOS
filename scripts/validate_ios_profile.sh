@@ -6,6 +6,8 @@ cd "$ROOT_DIR"
 
 PROFILE="${CLIPY_IOS_VALIDATION_PROFILE:-}"
 SCHEMES_RAW="${CLIPY_IOS_VALIDATION_SCHEMES:-}"
+CAPABILITIES_RAW="${CLIPY_IOS_VALIDATION_CAPABILITIES:-}"
+CHANGED_FILES_FORMAT="${CLIPY_IOS_CHANGED_FILES_FORMAT:-lines}"
 DRY_RUN="${CLIPY_IOS_VALIDATION_DRY_RUN:-0}"
 # 기본값은 simulator를 띄우지 않는 build-for-testing입니다. test mode는 필요한 작업에서만 명시합니다.
 export CLIPY_IOS_VALIDATION_MODE="${CLIPY_IOS_VALIDATION_MODE:-build-for-testing}"
@@ -17,6 +19,7 @@ usage() {
 Usage: CLIPY_IOS_VALIDATION_PROFILE=<profile> $0
 
 Profiles:
+  capabilities
   project-setup
   ci
   app-main
@@ -26,10 +29,12 @@ Profiles:
   docs-only
 
 Inputs:
-  CLIPY_IOS_VALIDATION_PROFILE   required canonical profile id
+  CLIPY_IOS_VALIDATION_PROFILE    required canonical profile id
+  CLIPY_IOS_VALIDATION_CAPABILITIES required for capabilities; comma or whitespace separated
   CLIPY_IOS_VALIDATION_SCHEMES    required for module/integration; comma or whitespace separated scheme names
   CLIPY_IOS_CHANGED_FILES        optional newline-separated file paths
-  CLIPY_IOS_CHANGED_FILES_FILE   optional file containing newline-separated paths
+  CLIPY_IOS_CHANGED_FILES_FILE   optional file containing changed file paths
+  CLIPY_IOS_CHANGED_FILES_FORMAT lines | nul for file input (default: lines)
   CLIPY_IOS_VALIDATION_DRY_RUN   set to 1 to print the command plan only
   CLIPY_IOS_VALIDATION_MODE      build-for-testing | build | test (default: build-for-testing)
   CLIPY_IOS_XCODEBUILD_CONFIGURATION optional xcodebuild configuration, such as Release
@@ -57,6 +62,9 @@ esac
 
 PLAN=()
 VALIDATION_SCHEMES=()
+REQUIREMENT_CAPABILITIES=()
+CONCRETE_CAPABILITIES=()
+CHANGED_FILE_PATHS=()
 PROJECT_SETUP_SCHEMES=(
   "CoreDomain"
   "CorePersistence"
@@ -187,6 +195,176 @@ requires_runtime_contract_test() {
   return 1
 }
 
+contains_value() {
+  local candidate="$1"
+  shift
+  local value
+
+  for value in "$@"; do
+    if [[ "$value" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+remove_concrete_capability() {
+  local removed="$1"
+  local filtered=()
+  local capability
+
+  if ((${#CONCRETE_CAPABILITIES[@]} > 0)); then
+    for capability in "${CONCRETE_CAPABILITIES[@]}"; do
+      if [[ "$capability" != "$removed" ]]; then
+        filtered+=("$capability")
+      fi
+    done
+  fi
+
+  CONCRETE_CAPABILITIES=()
+  if ((${#filtered[@]} > 0)); then
+    CONCRETE_CAPABILITIES=("${filtered[@]}")
+  fi
+}
+
+add_concrete_capability() {
+  local capability="$1"
+  local scheme
+
+  case "$capability" in
+    module:*:test)
+      scheme="${capability#module:}"
+      scheme="${scheme%:test}"
+      remove_concrete_capability "module:${scheme}:build"
+      ;;
+    module:*:build)
+      scheme="${capability#module:}"
+      scheme="${scheme%:build}"
+      if ((${#CONCRETE_CAPABILITIES[@]} > 0)) \
+        && contains_value "module:${scheme}:test" "${CONCRETE_CAPABILITIES[@]}"; then
+        return
+      fi
+      ;;
+  esac
+
+  if ((${#CONCRETE_CAPABILITIES[@]} > 0)) \
+    && contains_value "$capability" "${CONCRETE_CAPABILITIES[@]}"; then
+    return
+  fi
+
+  CONCRETE_CAPABILITIES+=("$capability")
+}
+
+read_validation_capabilities() {
+  local normalized
+  local capability
+
+  REQUIREMENT_CAPABILITIES=()
+  normalized="${CAPABILITIES_RAW//$'\n'/ }"
+  normalized="${normalized//,/ }"
+
+  set -f
+  for capability in $normalized; do
+    [[ -z "$capability" ]] && continue
+    if ((${#REQUIREMENT_CAPABILITIES[@]} == 0)) \
+      || ! contains_value "$capability" "${REQUIREMENT_CAPABILITIES[@]}"; then
+      REQUIREMENT_CAPABILITIES+=("$capability")
+    fi
+  done
+  set +f
+
+  if ((${#REQUIREMENT_CAPABILITIES[@]} == 0)); then
+    echo "capabilities profile requires CLIPY_IOS_VALIDATION_CAPABILITIES." >&2
+    exit 2
+  fi
+}
+
+validate_requirement_capability() {
+  local capability="$1"
+  local module_part
+  local mode
+  local scheme
+
+  case "$capability" in
+    docs|ci|project-setup|swiftlint-config|app-main)
+      return
+      ;;
+    module:*:build|module:*:test)
+      module_part="${capability#module:}"
+      mode="${module_part##*:}"
+      scheme="${module_part%:*}"
+      if [[ "$mode" != "build" && "$mode" != "test" ]]; then
+        echo "Unsupported module validation mode in capability: ${capability}" >&2
+        exit 2
+      fi
+      if ! contains_value "$scheme" "${PROJECT_SETUP_SCHEMES[@]}"; then
+        echo "Unsupported module validation scheme in capability: ${capability}" >&2
+        echo "Use app-main for AppMain validation." >&2
+        exit 2
+      fi
+      "$ROOT_DIR/scripts/validate_ios_module.sh" --check "$scheme"
+      return
+      ;;
+    *)
+      echo "Unsupported iOS validation capability: ${capability}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+expand_requirement_capabilities() {
+  local capability
+  local has_non_docs="0"
+  local scheme
+
+  read_validation_capabilities
+
+  for capability in "${REQUIREMENT_CAPABILITIES[@]}"; do
+    validate_requirement_capability "$capability"
+    if [[ "$capability" != "docs" ]]; then
+      has_non_docs="1"
+    fi
+  done
+
+  CONCRETE_CAPABILITIES=()
+  if [[ "$has_non_docs" == "0" ]]; then
+    add_concrete_capability "docs-changed-files-guard"
+    add_concrete_capability "generated-artifacts"
+    return
+  fi
+
+  for capability in "${REQUIREMENT_CAPABILITIES[@]}"; do
+    case "$capability" in
+      docs)
+        ;;
+      ci)
+        add_concrete_capability "tuist-foundation"
+        add_concrete_capability "validation-routing"
+        add_concrete_capability "workflow-yaml"
+        add_concrete_capability "app-main"
+        ;;
+      project-setup)
+        add_concrete_capability "tuist-foundation"
+        add_concrete_capability "app-main"
+        for scheme in "${PROJECT_SETUP_SCHEMES[@]}"; do
+          add_concrete_capability "module:${scheme}:build"
+        done
+        ;;
+      swiftlint-config)
+        add_concrete_capability "swiftlint-config"
+        ;;
+      app-main)
+        add_concrete_capability "app-main"
+        ;;
+      module:*)
+        add_concrete_capability "$capability"
+        add_concrete_capability "app-main"
+        ;;
+    esac
+  done
+}
+
 add_module_steps() {
   local scheme
 
@@ -217,20 +395,54 @@ add_project_setup_module_steps() {
   done
 }
 
-read_changed_files() {
-  # GitHub에서는 workflow가, 로컬에서는 사람이 changed files를 넘깁니다.
-  # 여기서는 출처를 따지지 않고 docs-only로 build를 생략해도 되는지만 검사합니다.
+append_changed_file() {
+  local path="$1"
+
+  [[ -z "$path" ]] && return
+  CHANGED_FILE_PATHS+=("$path")
+}
+
+collect_changed_files() {
+  local changed_files_file="${CLIPY_IOS_CHANGED_FILES_FILE:-}"
+  local path
+
+  CHANGED_FILE_PATHS=()
+  case "$CHANGED_FILES_FORMAT" in
+    lines|nul)
+      ;;
+    *)
+      echo "Unsupported CLIPY_IOS_CHANGED_FILES_FORMAT: ${CHANGED_FILES_FORMAT}" >&2
+      exit 2
+      ;;
+  esac
+
   if [[ -n "${CLIPY_IOS_CHANGED_FILES:-}" ]]; then
-    printf '%s\n' "$CLIPY_IOS_CHANGED_FILES"
+    while IFS= read -r path; do
+      append_changed_file "$path"
+    done <<< "$CLIPY_IOS_CHANGED_FILES"
     return
   fi
 
-  if [[ -n "${CLIPY_IOS_CHANGED_FILES_FILE:-}" ]]; then
-    if [[ ! -f "$CLIPY_IOS_CHANGED_FILES_FILE" ]]; then
-      echo "CLIPY_IOS_CHANGED_FILES_FILE does not exist: ${CLIPY_IOS_CHANGED_FILES_FILE}" >&2
-      exit 2
-    fi
-    cat "$CLIPY_IOS_CHANGED_FILES_FILE"
+  if [[ -z "$changed_files_file" ]]; then
+    return
+  fi
+  if [[ ! -f "$changed_files_file" ]]; then
+    echo "CLIPY_IOS_CHANGED_FILES_FILE does not exist: ${changed_files_file}" >&2
+    exit 2
+  fi
+  if [[ ! -r "$changed_files_file" ]]; then
+    echo "CLIPY_IOS_CHANGED_FILES_FILE is not readable: ${changed_files_file}" >&2
+    exit 2
+  fi
+
+  if [[ "$CHANGED_FILES_FORMAT" == "nul" ]]; then
+    while IFS= read -r -d '' path; do
+      append_changed_file "$path"
+    done < "$changed_files_file"
+  else
+    while IFS= read -r path || [[ -n "$path" ]]; do
+      append_changed_file "$path"
+    done < "$changed_files_file"
   fi
 }
 
@@ -250,25 +462,23 @@ is_docs_only_path() {
 }
 
 validate_docs_only_changed_files() {
-  local changed_files
   local invalid_paths=()
   local path
 
   # changed files 입력이 없으면 docs-only라고 보지 않습니다.
   # build를 생략하는 profile이라서, 증거가 없을 때 안전한 쪽으로 실패시킵니다.
-  changed_files="$(read_changed_files)"
+  collect_changed_files
 
-  if [[ -z "$changed_files" ]]; then
+  if ((${#CHANGED_FILE_PATHS[@]} == 0)); then
     echo "docs-only profile requires CLIPY_IOS_CHANGED_FILES or CLIPY_IOS_CHANGED_FILES_FILE." >&2
     exit 2
   fi
 
-  while IFS= read -r path; do
-    [[ -z "$path" ]] && continue
+  for path in "${CHANGED_FILE_PATHS[@]}"; do
     if ! is_docs_only_path "$path"; then
       invalid_paths+=("$path")
     fi
-  done <<< "$changed_files"
+  done
 
   if ((${#invalid_paths[@]} > 0)); then
     # docs-only로 돌렸지만 코드성 파일이 섞였으므로 더 넓은 profile로 다시 봐야 합니다.
@@ -298,6 +508,15 @@ validate_workflow_yaml() {
   echo "GitHub workflow YAML syntax check passed."
 }
 
+validate_swiftlint_config() {
+  ruby --disable-gems -e '
+    require "yaml"
+    config = YAML.load_file(".swiftlint.yml")
+    raise ".swiftlint.yml must contain a YAML mapping." unless config.is_a?(Hash)
+  '
+  echo "SwiftLint configuration YAML check passed."
+}
+
 prepare_tuist_workspace() {
   # GitHub runner에는 생성물이 없으므로 build profile에서는 install/generate를 먼저 돌립니다.
   # 재사용 flag는 이 함수가 성공한 뒤 같은 profile의 하위 script에만 넘깁니다.
@@ -308,10 +527,60 @@ prepare_tuist_workspace() {
   mise exec -- tuist generate --no-open
 }
 
+has_concrete_capability() {
+  contains_value "$1" "${CONCRETE_CAPABILITIES[@]}"
+}
+
+plan_for_capabilities() {
+  local scheme
+
+  expand_requirement_capabilities
+
+  # 실행 순서는 capability 입력 순서와 무관하게 고정합니다.
+  # 같은 요구사항 조합이면 label 순서나 changed-file 순서가 달라도 동일한 plan이 나와야 합니다.
+  if has_concrete_capability "docs-changed-files-guard"; then
+    add_function_step "Docs-only changed files check" validate_docs_only_changed_files
+  fi
+  if has_concrete_capability "generated-artifacts"; then
+    add_script_step "Tracked generated artifact preflight" "$ROOT_DIR/scripts/validate_tuist_foundation.sh" "--generated-artifacts-only"
+  fi
+  if has_concrete_capability "tuist-foundation"; then
+    add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
+  fi
+  if has_concrete_capability "validation-routing"; then
+    add_script_step "iOS validation routing contract" "$ROOT_DIR/scripts/validate_ios_routing.sh"
+  fi
+  if has_concrete_capability "workflow-yaml"; then
+    add_function_step "GitHub workflow YAML syntax" validate_workflow_yaml
+  fi
+  if has_concrete_capability "swiftlint-config"; then
+    add_function_step "SwiftLint configuration YAML" validate_swiftlint_config
+  fi
+
+  for scheme in "${PROJECT_SETUP_SCHEMES[@]}"; do
+    if has_concrete_capability "module:${scheme}:test"; then
+      add_build_step_with_mode \
+        "Module ${scheme} contract test" \
+        "test" \
+        "$ROOT_DIR/scripts/validate_ios_module.sh" \
+        "$scheme"
+    elif has_concrete_capability "module:${scheme}:build"; then
+      add_build_step "Module ${scheme}" "$ROOT_DIR/scripts/validate_ios_module.sh" "$scheme"
+    fi
+  done
+
+  if has_concrete_capability "app-main"; then
+    add_build_step "AppMain baseline" "$ROOT_DIR/scripts/validate_ios_baseline.sh"
+  fi
+}
+
 plan_for_profile() {
   # profile은 검증 비용과 조합을 정하고, scheme 입력은 실제 대상을 정합니다.
   # 새 module은 허용 scheme 목록과 label resolver까지 맞춘 뒤 profile에 넣습니다.
   case "$PROFILE" in
+    capabilities)
+      plan_for_capabilities
+      ;;
     project-setup)
       # Tuist helper나 manifest 규칙을 건드렸을 때는 module build까지 넓게 봅니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
@@ -319,7 +588,7 @@ plan_for_profile() {
       add_project_setup_module_steps
       ;;
     ci)
-      # GitHub Actions나 validation script 변경은 YAML과 AppMain 조립을 보고, 검증 scheme이 연결된 AREA가 있으면 해당 scheme도 같이 봅니다.
+      # manual dispatch에서 쓰는 호환 profile입니다. PR은 capabilities profile로 합집합을 계산합니다.
       add_script_step "Static Tuist policy" "$ROOT_DIR/scripts/validate_tuist_foundation.sh"
       add_script_step "iOS validation routing contract" "$ROOT_DIR/scripts/validate_ios_routing.sh"
       add_function_step "GitHub workflow YAML syntax" validate_workflow_yaml
@@ -371,6 +640,9 @@ print_plan() {
   # dry-run도 같은 PLAN을 보므로 build 없이 실제 검증 순서를 확인할 수 있습니다.
   echo "Validation profile: ${PROFILE}"
   echo "Validation mode: ${CLIPY_IOS_VALIDATION_MODE}"
+  if [[ "$PROFILE" == "capabilities" ]]; then
+    echo "Validation capabilities: ${CAPABILITIES_RAW}"
+  fi
   if plan_has_build_step; then
     echo "Tuist prep: once before the first build step"
   else

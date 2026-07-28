@@ -4,12 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# 로컬 fixture와 GitHub Actions payload가 같은 label 해석 규칙을 타야 CI 라우팅을 재현할 수 있습니다.
 LABELS_RAW="${CLIPY_IOS_PR_LABELS:-}"
+CHANGED_FILES_FORMAT="${CLIPY_IOS_CHANGED_FILES_FORMAT:-lines}"
 DRY_RUN="${CLIPY_IOS_LABEL_ROUTER_DRY_RUN:-0}"
 
-# GitHub Actions에서는 event payload를, 로컬 fixture에서는 env label 목록을 받습니다.
-# 두 입력은 같은 label list로 정리하고, stdout에는 profile/scheme env만 내보냅니다.
 usage() {
   cat >&2 <<USAGE
 Usage: CLIPY_IOS_PR_LABELS=<newline-separated labels> $0
@@ -17,11 +15,14 @@ Usage: CLIPY_IOS_PR_LABELS=<newline-separated labels> $0
 Inputs:
   CLIPY_IOS_PR_LABELS             optional newline-separated GitHub PR label names
   GITHUB_EVENT_PATH               optional GitHub pull_request event payload path
-  CLIPY_IOS_LABEL_ROUTER_DRY_RUN  set to 1 to print the same env output without CI side effects
+  CLIPY_IOS_CHANGED_FILES         optional newline-separated changed file paths
+  CLIPY_IOS_CHANGED_FILES_FILE    optional file containing changed file paths
+  CLIPY_IOS_CHANGED_FILES_FORMAT  lines | nul for file input (default: lines)
+  CLIPY_IOS_LABEL_ROUTER_DRY_RUN  set to 1 to log the resolved inputs to stderr
 
 Output:
-  CLIPY_IOS_VALIDATION_PROFILE=<profile>
-  CLIPY_IOS_VALIDATION_SCHEMES=<schemes>
+  CLIPY_IOS_VALIDATION_PROFILE=capabilities
+  CLIPY_IOS_VALIDATION_CAPABILITIES=<space-separated capabilities>
 USAGE
 }
 
@@ -36,8 +37,11 @@ read_labels_from_event() {
     echo "GITHUB_EVENT_PATH does not exist: ${event_path}" >&2
     exit 2
   fi
+  if [[ ! -r "$event_path" ]]; then
+    echo "GITHUB_EVENT_PATH is not readable: ${event_path}" >&2
+    exit 2
+  fi
 
-  # GitHub 입력은 PR payload까지만 읽습니다. label 조회 권한이나 네트워크 상태가 CI 라우팅을 바꾸면 안 됩니다.
   python3 - "$event_path" <<'PY'
 import json
 import sys
@@ -67,8 +71,6 @@ fail() {
   exit 2
 }
 
-# label 분류 기준은 일부러 엄격하게 둡니다.
-# 새 TYPE/AREA를 조용히 통과시키면 PR 변경보다 좁은 profile로 검증될 수 있습니다.
 is_supported_type() {
   case "$1" in
     "TYPE | Feature"|"TYPE | Bug"|"TYPE | Refactor"|"TYPE | Docs"|"TYPE | Test"|"TYPE | Chore")
@@ -91,12 +93,13 @@ is_supported_area() {
   esac
 }
 
-has_area() {
-  local expected="$1"
-  local area_label
+contains_capability() {
+  local candidate="$1"
+  shift
+  local capability
 
-  for area_label in "${AREA_LABELS[@]}"; do
-    if [[ "$area_label" == "$expected" ]]; then
+  for capability in "$@"; do
+    if [[ "$capability" == "$candidate" ]]; then
       return 0
     fi
   done
@@ -104,31 +107,185 @@ has_area() {
   return 1
 }
 
-append_scheme_for_area() {
+add_capability() {
+  local capability="$1"
+
+  if ((${#CAPABILITIES[@]} > 0)) && contains_capability "$capability" "${CAPABILITIES[@]}"; then
+    return
+  fi
+
+  CAPABILITIES+=("$capability")
+}
+
+add_capability_for_area() {
   case "$1" in
+    "AREA | Docs")
+      add_capability "docs"
+      ;;
+    "AREA | Project Setup")
+      add_capability "project-setup"
+      ;;
+    "AREA | CI")
+      add_capability "ci"
+      ;;
+    "AREA | AppMain")
+      add_capability "app-main"
+      ;;
     "AREA | CoreDomain")
-      SCHEMES+=("CoreDomain")
+      add_capability "module:CoreDomain:build"
       ;;
     "AREA | CorePersistence")
-      SCHEMES+=("CorePersistence")
+      add_capability "module:CorePersistence:build"
       ;;
     "AREA | UI System")
-      SCHEMES+=("CoreDesignSystem")
+      add_capability "module:CoreDesignSystem:test"
       ;;
     "AREA | FeatureHome")
-      SCHEMES+=("FeatureHome")
+      add_capability "module:FeatureHome:build"
       ;;
     "AREA | FeatureSession")
-      SCHEMES+=("FeatureSession")
+      add_capability "module:FeatureSession:build"
       ;;
   esac
 }
 
-emit_env() {
-  # stdout은 호출자가 그대로 $GITHUB_ENV에 붙입니다.
-  # 사람이 읽는 로그가 섞이면 GitHub env file이 깨지므로 안내는 stderr에만 씁니다.
-  printf 'CLIPY_IOS_VALIDATION_PROFILE=%s\n' "$PROFILE"
-  printf 'CLIPY_IOS_VALIDATION_SCHEMES=%s\n' "$SCHEMES_OUTPUT"
+add_capability_for_path() {
+  local path="$1"
+
+  case "$path" in
+    Docs/*|README.md|Docs.md|AGENTS.md|.github/ISSUE_TEMPLATE/*|.github/PULL_REQUEST_TEMPLATE/*|.github/pull_request_template.md)
+      add_capability "docs"
+      ;;
+    .swiftlint.yml)
+      add_capability "swiftlint-config"
+      ;;
+    .github/workflows/*|scripts/validate_ios_*.sh|scripts/validate_tuist_foundation.sh|scripts/resolve_ios_validation_from_labels.sh)
+      add_capability "ci"
+      ;;
+    .mise.toml|Tuist.swift|Workspace.swift|Tuist/*|Modules/*/Project.swift)
+      add_capability "project-setup"
+      ;;
+    Modules/AppMain/*)
+      add_capability "app-main"
+      ;;
+    Modules/CoreDomain/*)
+      add_capability "module:CoreDomain:build"
+      ;;
+    Modules/CorePersistence/*)
+      add_capability "module:CorePersistence:build"
+      ;;
+    Modules/CoreDesignSystem/*)
+      add_capability "module:CoreDesignSystem:test"
+      ;;
+    Modules/FeatureHome/*)
+      add_capability "module:FeatureHome:build"
+      ;;
+    Modules/FeatureSession/*)
+      add_capability "module:FeatureSession:build"
+      ;;
+    *)
+      echo "No iOS validation capability mapping found for changed path: ${path}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+record_changed_file() {
+  local path="$1"
+
+  [[ -z "$path" ]] && return
+  CHANGED_FILES+=("$path")
+  add_capability_for_path "$path"
+}
+
+collect_changed_files() {
+  local changed_files_file="${CLIPY_IOS_CHANGED_FILES_FILE:-}"
+  local path
+
+  case "$CHANGED_FILES_FORMAT" in
+    lines|nul)
+      ;;
+    *)
+      echo "Unsupported CLIPY_IOS_CHANGED_FILES_FORMAT: ${CHANGED_FILES_FORMAT}" >&2
+      exit 2
+      ;;
+  esac
+
+  # 직접 env로 넘기는 로컬 fixture는 기존 newline 계약을 유지합니다.
+  if [[ -n "${CLIPY_IOS_CHANGED_FILES:-}" ]]; then
+    while IFS= read -r path; do
+      record_changed_file "$path"
+    done <<< "$CLIPY_IOS_CHANGED_FILES"
+    return
+  fi
+
+  if [[ -z "$changed_files_file" ]]; then
+    return
+  fi
+  if [[ ! -f "$changed_files_file" ]]; then
+    echo "CLIPY_IOS_CHANGED_FILES_FILE does not exist: ${changed_files_file}" >&2
+    exit 2
+  fi
+  if [[ ! -r "$changed_files_file" ]]; then
+    echo "CLIPY_IOS_CHANGED_FILES_FILE is not readable: ${changed_files_file}" >&2
+    exit 2
+  fi
+
+  if [[ "$CHANGED_FILES_FORMAT" == "nul" ]]; then
+    while IFS= read -r -d '' path; do
+      record_changed_file "$path"
+    done < "$changed_files_file"
+  else
+    while IFS= read -r path || [[ -n "$path" ]]; do
+      record_changed_file "$path"
+    done < "$changed_files_file"
+  fi
+}
+
+has_non_docs_capability() {
+  local capability
+
+  for capability in "${CAPABILITIES[@]}"; do
+    if [[ "$capability" != "docs" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+emit_capabilities() {
+  local ordered_capabilities=(
+    "docs"
+    "ci"
+    "project-setup"
+    "swiftlint-config"
+    "app-main"
+    "module:CoreDomain:build"
+    "module:CorePersistence:build"
+    "module:CoreDesignSystem:build"
+    "module:CoreDesignSystem:test"
+    "module:FeatureHome:build"
+    "module:FeatureSession:build"
+  )
+  local output=()
+  local capability
+
+  for capability in "${ordered_capabilities[@]}"; do
+    if contains_capability "$capability" "${CAPABILITIES[@]}"; then
+      if [[ "$capability" == "docs" ]] && has_non_docs_capability; then
+        continue
+      fi
+      output+=("$capability")
+    fi
+  done
+
+  if ((${#output[@]} == 0)); then
+    fail "No validation capability mapping found for the provided labels and changed files."
+  fi
+
+  printf 'CLIPY_IOS_VALIDATION_PROFILE=capabilities\n'
+  printf 'CLIPY_IOS_VALIDATION_CAPABILITIES=%s\n' "${output[*]}"
 }
 
 LABELS=()
@@ -136,9 +293,10 @@ TYPE_LABELS=()
 AREA_LABELS=()
 UNSUPPORTED_LABELS=()
 UNSUPPORTED_AREA_LABELS=()
+CAPABILITIES=()
+CHANGED_FILES=()
+LABEL_INPUT="$(read_labels)"
 
-# 여기서부터 입력 label을 TYPE, AREA, 미지원 label로 나눕니다.
-# routing에 쓰지 않는 label도 조용히 무시하지 않습니다. label 기준과 resolver 기준이 달라지는 상황을 빨리 잡기 위해서입니다.
 while IFS= read -r label; do
   [[ -z "$label" ]] && continue
   LABELS+=("$label")
@@ -157,7 +315,7 @@ while IFS= read -r label; do
       UNSUPPORTED_LABELS+=("$label")
       ;;
   esac
-done < <(read_labels)
+done <<< "$LABEL_INPUT"
 
 if ((${#LABELS[@]} == 0)); then
   fail "No GitHub PR labels found. Set CLIPY_IOS_PR_LABELS or provide GITHUB_EVENT_PATH."
@@ -197,55 +355,25 @@ if ! is_supported_type "$TYPE_LABEL"; then
   exit 2
 fi
 
-PROFILE=""
-SCHEMES=()
-SCHEMES_OUTPUT=""
-
 for area_label in "${AREA_LABELS[@]}"; do
-  append_scheme_for_area "$area_label"
+  add_capability_for_area "$area_label"
 done
 
-# docs-only는 build를 생략하는 위험한 profile입니다.
-# TYPE과 AREA가 모두 문서 변경을 가리킬 때만 허용하고, 다른 AREA가 섞이면 바로 실패시킵니다.
-if [[ "$TYPE_LABEL" == "TYPE | Docs" ]]; then
-  if ((${#AREA_LABELS[@]} != 1)) || ! has_area "AREA | Docs"; then
-    echo "TYPE | Docs must be paired only with AREA | Docs." >&2
-    printf 'AREA labels:\n' >&2
-    printf '  %s\n' "${AREA_LABELS[@]}" >&2
-    exit 2
-  fi
+collect_changed_files
 
-  PROFILE="docs-only"
-elif has_area "AREA | Docs"; then
-  echo "AREA | Docs requires TYPE | Docs." >&2
+if [[ "$TYPE_LABEL" == "TYPE | Docs" ]] && has_non_docs_capability; then
+  echo "TYPE | Docs cannot describe code, project, lint, or CI validation requirements." >&2
+  echo "Resolved capabilities: ${CAPABILITIES[*]}" >&2
   exit 2
-elif has_area "AREA | CI"; then
-  # CI label이 섞인 PR은 CI 검증을 유지하면서 함께 지정한 검증 scheme도 같은 plan에서 확인합니다.
-  PROFILE="ci"
-  if ((${#SCHEMES[@]} > 0)); then
-    SCHEMES_OUTPUT="${SCHEMES[*]}"
-  fi
-elif has_area "AREA | Project Setup"; then
-  PROFILE="project-setup"
-else
-  # 검증 scheme이 연결된 AREA는 AppMain 조립까지 봐야 하므로 integration profile로 보냅니다.
-  if ((${#SCHEMES[@]} > 0)); then
-    PROFILE="integration"
-    SCHEMES_OUTPUT="${SCHEMES[*]}"
-  elif has_area "AREA | AppMain"; then
-    PROFILE="app-main"
-  else
-    fail "No validation profile mapping found for the provided labels."
-  fi
-fi
-
-if [[ -z "$PROFILE" ]]; then
-  fail "No validation profile mapping found for the provided labels."
 fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
   echo "Resolved iOS validation labels:" >&2
   printf '  %s\n' "${LABELS[@]}" >&2
+  if ((${#CHANGED_FILES[@]} > 0)); then
+    echo "Resolved changed files:" >&2
+    printf '  %s\n' "${CHANGED_FILES[@]}" >&2
+  fi
 fi
 
-emit_env
+emit_capabilities
