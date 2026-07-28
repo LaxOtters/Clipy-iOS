@@ -77,12 +77,15 @@ extension CoreModule: ClipyModuleIdentifiable {
 
 /// 화면이나 사용자 흐름 단위로 나뉘는 feature module입니다.
 public enum FeatureModule {
+    case featureHome
     case featureSession
 }
 
 extension FeatureModule: ClipyModuleIdentifiable {
     var name: String {
         switch self {
+        case .featureHome:
+            return "FeatureHome"
         case .featureSession:
             return "FeatureSession"
         }
@@ -90,6 +93,8 @@ extension FeatureModule: ClipyModuleIdentifiable {
 
     var bundleIdSuffix: String {
         switch self {
+        case .featureHome:
+            return "feature-home"
         case .featureSession:
             return "feature-session"
         }

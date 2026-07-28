@@ -9,6 +9,19 @@
 
 import PackageDescription
 
+#if TUIST
+import struct ProjectDescription.PackageSettings
+
+let packageSettings = PackageSettings(
+    productTypes: [
+        "RxSwift": .framework,
+        "RxCocoa": .framework,
+        "RxRelay": .framework,
+        "RxCocoaRuntime": .framework
+    ]
+)
+#endif
+
 let package = Package(
     name: "ClipyDependencies",
     dependencies: [

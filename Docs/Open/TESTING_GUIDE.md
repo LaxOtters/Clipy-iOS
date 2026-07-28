@@ -130,6 +130,29 @@ WebView, Bottom Sheet, navigation은 직접 unit test하기보다 그 상태를 
 - ViewController 내부 collaborator를 모두 mock으로 바꿔 호출 순서를 검증합니다.
 - placeholder label이나 임시 subview가 존재하는지만 확인합니다.
 - 보임/숨김 규칙을 state가 아니라 subview hierarchy로만 검증합니다.
+- unit test가 UIKit view를 찾을 목적으로 `accessibilityIdentifier`나 `tag`를 제품 코드에 추가하지 않습니다.
+
+`accessibilityIdentifier`는 실제 접근성 요구나 UI test처럼 제품과 검증 환경에서 함께 쓰는 이유가 있을 때만 둡니다.
+unit test helper 하나를 위해 추가했다면 테스트 경계를 다시 봅니다.
+이때 hierarchy 탐색을 없앤다는 이유로 그 테스트가 함께 확인하던 제품 규칙까지 삭제하지 않습니다.
+route mapping, dependency 생성 실패, 재시도처럼 UI 밖에서도 설명할 수 있는 규칙은 작은 `Mapper`, `Policy`, 작업 타입으로 옮겨 직접 테스트합니다.
+
+## 이미지와 리소스 테스트
+
+화면을 꾸미는 정적 이미지가 asset catalog에 들어 있는지만 확인하는 unit test는 기본적으로 남기지 않습니다.
+아이콘 이름, PNG 크기, 1x/2x/3x rendition처럼 디자인 교체에 따라 바뀌는 값도 같은 기준으로 봅니다.
+이런 차이는 unit test보다 build, screenshot, source review로 확인하는 편이 낫습니다.
+
+리소스 테스트를 남기려면 누락됐을 때 깨지는 제품 규칙과 앱의 처리 방식이 먼저 정해져 있어야 합니다.
+예를 들어 placeholder로 바꾸거나 오류 상태를 보여주는 동작이 제품 규칙이라면, 특정 파일의 존재 여부가 아니라 그 대체 동작을 테스트합니다.
+CoreDesignSystem이 외부 모듈에 공개하는 아이콘처럼 크기와 rendering mode가 API 규약인 경우에는 해당 공개 규약만 좁게 검증할 수 있습니다.
+
+아래 테스트는 삭제 후보입니다.
+
+- static illustration을 `XCTAssertNotNil`로 나열합니다.
+- `UIImageAsset`에서 scale별 rendition이 선택되는지 반복 확인합니다.
+- asset의 pixel 크기나 파일명을 production 상수와 그대로 비교합니다.
+- placeholder 파일이 catalog에 존재하는지만 확인합니다.
 
 ## 테스트 스타일 우선순위
 
@@ -357,6 +380,7 @@ func test_restoringPendingSession_keepsWebViewAndBottomSheetState()
 - stub 호출 여부를 검증하는 테스트
 - production constant를 그대로 가져와 비교하는 tautology test
 - UIKit layout detail에 과하게 묶인 unit test
+- static asset 존재 여부나 scale별 rendition만 확인하는 resource test
 
 Private method가 너무 복잡해서 직접 테스트하고 싶다면 숨은 abstraction이 있다는 신호일 수 있습니다.
 access level을 올리기보다 `Policy`, `Mapper`, `StateMachine` 같은 타입으로 분리할지 봅니다.
@@ -410,5 +434,7 @@ TDD 중에는 임시 테스트를 더 많이 둘 수 있습니다.
 - [ ] 시간, UUID, random 값은 고정하거나 명시적으로 주입했습니다.
 - [ ] UIKit 화면 코드는 unit test보다 더 가벼운 확인 방법이 맞는지 봤습니다.
 - [ ] placeholder, subview hierarchy, constraint 같은 UI 존재 테스트를 PR에 남길 이유가 분명합니다.
+- [ ] asset 존재 여부나 pixel 크기를 unit test로 고정하지 않았습니다.
+- [ ] unit test를 위해 accessibility metadata나 view tag를 제품 코드에 추가하지 않았습니다.
 - [ ] TDD 중 임시 테스트와 오래 남길 regression 테스트를 구분했습니다.
 - [ ] 주석은 제품 이유를 설명할 때만 남겼습니다.

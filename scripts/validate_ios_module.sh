@@ -13,6 +13,7 @@ SUPPORTED_SCHEMES=(
   "CoreDomain"
   "CorePersistence"
   "CoreDesignSystem"
+  "FeatureHome"
   "FeatureSession"
 )
 

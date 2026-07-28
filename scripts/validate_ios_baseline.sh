@@ -124,7 +124,8 @@ if [[ "$SKIP_TUIST_PREP" == "1" ]]; then
   echo "Skipping Tuist install/generate."
 else
   mise exec -- tuist install
-  mise exec -- tuist generate
+  # 검증 중 Xcode workspace를 열어 현재 작업 화면의 포커스를 바꾸지 않습니다.
+  mise exec -- tuist generate --no-open
 fi
 
 # 여기서부터 Tuist가 만든 workspace/scheme을 xcodebuild로 확인합니다.

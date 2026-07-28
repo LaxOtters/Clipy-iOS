@@ -12,6 +12,7 @@ on:
     paths:
       - ".github/workflows/ios-baseline.yml"
       - ".mise.toml"
+      - ".swiftlint.yml"
       - "Tuist.swift"
       - "Workspace.swift"
       - "Tuist/**"
@@ -84,10 +85,19 @@ jobs:
           CHANGED_FILES_PATH: /tmp/clipy_changed_files
         run: |
           git fetch origin "$BASE_REF" --depth=1
-          git diff --name-only "origin/${BASE_REF}...HEAD" > "$CHANGED_FILES_PATH"
+          git diff --no-renames --name-only -z "origin/${BASE_REF}...HEAD" > "$CHANGED_FILES_PATH"
           echo "CLIPY_IOS_CHANGED_FILES_FILE=$CHANGED_FILES_PATH" >> "$GITHUB_ENV"
+          echo "CLIPY_IOS_CHANGED_FILES_FORMAT=nul" >> "$GITHUB_ENV"
           echo "Changed files:"
-          cat "$CHANGED_FILES_PATH"
+          python3 - "$CHANGED_FILES_PATH" <<'PY'
+          import os
+          import sys
+
+          with open(sys.argv[1], "rb") as changed_files:
+              for raw_path in changed_files.read().split(b"\0"):
+                  if raw_path:
+                      print(repr(os.fsdecode(raw_path)))
+          PY
 
       - name: Resolve validation profile from PR labels
         if: ${{ github.event_name == 'pull_request' }}
@@ -121,6 +131,7 @@ jobs:
           printf 'CLIPY_IOS_VALIDATION_PROFILE=%s\n' "$INPUT_PROFILE" >> "$GITHUB_ENV"
           printf 'CLIPY_IOS_VALIDATION_SCHEMES=%s\n' "$INPUT_SCHEMES" >> "$GITHUB_ENV"
           printf 'CLIPY_IOS_CHANGED_FILES_FILE=%s\n' "$MANUAL_CHANGED_FILES_PATH" >> "$GITHUB_ENV"
+          printf 'CLIPY_IOS_CHANGED_FILES_FORMAT=lines\n' >> "$GITHUB_ENV"
           printf 'CLIPY_IOS_VALIDATION_MODE=%s\n' "$INPUT_MODE" >> "$GITHUB_ENV"
 
       - name: Install mise

@@ -60,12 +60,18 @@ public enum ClipyModuleFactory {
     public static func makeFeature(
         module: FeatureModule,
         dependencies: [FeatureDependency] = [],
-        hasTests: Bool = true
+        hasTests: Bool = true,
+        resources: ResourceFileElements? = nil,
+        synthesizesBundleAccessors: Bool = true,
+        synthesizesResourceAccessors: Bool = true
     ) -> Project {
         makeFramework(
             module: module,
             dependencies: dependencies.map(\.targetDependency),
-            hasTests: hasTests
+            hasTests: hasTests,
+            resources: resources,
+            synthesizesBundleAccessors: synthesizesBundleAccessors,
+            synthesizesResourceAccessors: synthesizesResourceAccessors
         )
     }
 }

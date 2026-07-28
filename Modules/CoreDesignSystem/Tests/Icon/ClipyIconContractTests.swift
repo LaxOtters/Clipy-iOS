@@ -41,6 +41,11 @@ final class ClipyIconContractTests: XCTestCase {
         }
     }
 
+    func test_rightArrow_returnsTwelvePointTemplateImage_readyForSharedTinting() {
+        XCTAssertEqual(ClipyIcon.rightArrow.size, CGSize(width: 12, height: 12))
+        XCTAssertEqual(ClipyIcon.rightArrow.renderingMode, .alwaysTemplate)
+    }
+
     private func renderedPayload(_ image: UIImage) -> Data {
         let imageView = UIImageView(image: image)
         imageView.tintColor = .black
