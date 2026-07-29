@@ -29,7 +29,7 @@ public enum ClipyProjectConfig {
                 ]
             ]
         ],
-        "UILaunchScreen": [:],
+        "UILaunchStoryboardName": "LaunchScreen",
         "UISupportedInterfaceOrientations": [
             "UIInterfaceOrientationPortrait"
         ]

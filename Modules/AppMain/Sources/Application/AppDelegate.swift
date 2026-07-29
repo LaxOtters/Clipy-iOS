@@ -9,6 +9,17 @@ import UIKit
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
+    private var hasClaimedSplashPresentation = false
+
+    func claimSplashPresentation() -> Bool {
+        guard !hasClaimedSplashPresentation else {
+            return false
+        }
+
+        hasClaimedSplashPresentation = true
+        return true
+    }
+
     func application(
         _ application: UIApplication,
         configurationForConnecting connectingSceneSession: UISceneSession,

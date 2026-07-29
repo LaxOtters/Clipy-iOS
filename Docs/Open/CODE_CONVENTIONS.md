@@ -42,7 +42,15 @@ UIKit 화면 코드는 가능한 한 얇게 둡니다.
 ViewController는 navigation, binding, rendering에 집중합니다.
 
 제품 규칙은 ViewController 내부에 오래 두지 않습니다.
-비교, 결정, 저장/복원 같은 규칙은 Domain, State Machine, ViewModel 쪽으로 옮깁니다.
+비교, 결정, 저장/복원 같은 규칙은 먼저 그 동작을 소유하는 Domain이나 ViewModel로 옮깁니다.
+
+ViewModel은 화면 동작의 소유자입니다.
+사용자 action뿐 아니라 화면 동작에 영향을 주는 lifecycle이나 system event도 input으로 받을 수 있습니다.
+UIKit callback을 그대로 전달하기보다 `screenBecameVisible`, `refreshRequested`처럼 화면에서 의미 있는 event로 바꿉니다.
+
+State Machine은 별도의 화면 계층이 아닙니다.
+event 순서, 중복, interruption처럼 허용되는 상태 전이가 중요한 경우 Domain, ViewModel, Coordinator 같은 소유자 내부에서 사용합니다.
+직접 UIKit을 렌더링하거나 navigation, repository, 외부 SDK를 실행하지 않고 현재 state와 event로 다음 state와 command만 결정합니다.
 
 ## 의존성
 

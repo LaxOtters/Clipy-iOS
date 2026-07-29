@@ -10,5 +10,6 @@ import ProjectDescriptionHelpers
 
 let project = ClipyModuleFactory.makeApp(
     module: .appMain,
-    dependencies: ClipyDependencies.appMain
+    dependencies: ClipyDependencies.appMain,
+    resources: ["Resources/**"]
 )
