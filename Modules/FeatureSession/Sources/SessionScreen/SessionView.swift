@@ -70,10 +70,26 @@ extension SessionView {
         browserView.load(url: url)
     }
 
+    func goBack() {
+        browserView.goBack()
+    }
+
+    func goForward() {
+        browserView.goForward()
+    }
+
+    func reload() {
+        browserView.reload()
+    }
+
     /// 하나의 chrome state를 Top Bar와 Bottom Sheet에 같이 그립니다.
     func render(chromeState: SessionChromeState, animated: Bool) {
         topBarView.render(state: chromeState.topBarState)
         bottomSheetView.render(state: chromeState.bottomSheetState, animated: animated)
+    }
+
+    func render(browserState: SessionBrowserState) {
+        bottomSheetView.render(browserState: browserState)
     }
 }
 
@@ -94,6 +110,22 @@ extension Reactive where Base: SessionView {
 
     var navigationFinished: Signal<Void> {
         base.browserView.rx.navigationFinished
+    }
+
+    var browserState: Driver<SessionBrowserState> {
+        base.browserView.rx.browserState
+    }
+
+    var backTap: ControlEvent<Void> {
+        base.bottomSheetView.rx.backTap
+    }
+
+    var forwardTap: ControlEvent<Void> {
+        base.bottomSheetView.rx.forwardTap
+    }
+
+    var reloadTap: ControlEvent<Void> {
+        base.bottomSheetView.rx.reloadTap
     }
 
     var bottomSheetDragEnded: Signal<SessionBottomSheetAction> {
