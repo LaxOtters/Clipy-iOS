@@ -15,4 +15,13 @@ enum SessionBottomSheetState: Equatable, CaseIterable {
     case peek
     /// 비교/결정 컨텐츠를 보기 위해 status bar 아래까지 sheet를 확장한 높이입니다.
     case expanded
+
+    var avoidsDockedKeyboard: Bool {
+        switch self {
+        case .hidden, .expanded:
+            return false
+        case .minimized, .peek:
+            return true
+        }
+    }
 }

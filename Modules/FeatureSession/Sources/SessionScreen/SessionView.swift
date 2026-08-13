@@ -17,17 +17,28 @@ final class SessionView: UIView {
     fileprivate let topBarView = SessionTopBarView()
     fileprivate let browserView = SessionWebView()
     fileprivate let bottomSheetView = SessionBottomSheetView()
+    private var topBarFoldedConstraints: [NSLayoutConstraint] = []
+    private var topBarUnfoldedConstraints: [NSLayoutConstraint] = []
+    private var bottomSheetScreenBottomConstraint: NSLayoutConstraint!
+    private var bottomSheetKeyboardTopConstraint: NSLayoutConstraint!
+    private var renderedBottomSheetState = SessionChromeState.newSession.bottomSheetState
+    private var isTrackingDockedKeyboard = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         configureHierarchy()
         configureStyle()
         configureLayout()
+        configureKeyboardObservation()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         nil
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func configureHierarchy() {
@@ -45,6 +56,20 @@ final class SessionView: UIView {
         browserView.translatesAutoresizingMaskIntoConstraints = false
         bottomSheetView.translatesAutoresizingMaskIntoConstraints = false
 
+        topBarFoldedConstraints = [
+            topBarView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            topBarView.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
+            topBarView.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor)
+        ]
+        topBarUnfoldedConstraints = [
+            topBarView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
+            topBarView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor)
+        ]
+        bottomSheetScreenBottomConstraint = bottomSheetView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        bottomSheetKeyboardTopConstraint = bottomSheetView.bottomAnchor.constraint(
+            equalTo: keyboardLayoutGuide.topAnchor
+        )
+
         NSLayoutConstraint.activate([
             browserView.topAnchor.constraint(equalTo: topAnchor),
             browserView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -52,14 +77,67 @@ final class SessionView: UIView {
             browserView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             topBarView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 12),
-            topBarView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
-            topBarView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
 
             bottomSheetView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
             bottomSheetView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            bottomSheetView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            bottomSheetView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
+            bottomSheetView.trailingAnchor.constraint(equalTo: trailingAnchor)
+        ] + topBarUnfoldedConstraints + [bottomSheetScreenBottomConstraint])
+    }
+
+    private func configureKeyboardObservation() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardFrameWillChange(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardDidHide(_:)),
+            name: UIResponder.keyboardDidHideNotification,
+            object: nil
+        )
+    }
+
+    @objc
+    private func keyboardFrameWillChange(_ notification: Notification) {
+        guard
+            window != nil,
+            let frameValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue
+        else {
+            return
+        }
+
+        let keyboardFrame = convert(frameValue.cgRectValue, from: nil)
+        if isTrackingDockedKeyboard, keyboardFrame.minY >= bounds.maxY {
+            // Dismiss 중에는 keyboard guide를 유지하고 didHide 이후 화면 하단으로 돌아갑니다.
+            return
+        }
+
+        isTrackingDockedKeyboard = keyboardFrame.minY < bounds.maxY
+            && keyboardFrame.maxY >= bounds.maxY - 1
+        updateBottomSheetBottomConstraint()
+    }
+
+    @objc
+    private func keyboardDidHide(_: Notification) {
+        isTrackingDockedKeyboard = false
+        updateBottomSheetBottomConstraint()
+    }
+
+    private func updateTopBarConstraints(for state: SessionTopBarState) {
+        let isFolded = state == .folded
+        NSLayoutConstraint.deactivate(isFolded ? topBarUnfoldedConstraints : topBarFoldedConstraints)
+        NSLayoutConstraint.activate(isFolded ? topBarFoldedConstraints : topBarUnfoldedConstraints)
+    }
+
+    private func updateBottomSheetBottomConstraint() {
+        let avoidsKeyboard = renderedBottomSheetState.avoidsDockedKeyboard
+            && isTrackingDockedKeyboard
+
+        bottomSheetScreenBottomConstraint.isActive = !avoidsKeyboard
+        bottomSheetKeyboardTopConstraint.isActive = avoidsKeyboard
+        layoutIfNeeded()
     }
 }
 
@@ -85,6 +163,9 @@ extension SessionView {
     /// 하나의 chrome state를 Top Bar와 Bottom Sheet에 같이 그립니다.
     func render(chromeState: SessionChromeState, animated: Bool) {
         topBarView.render(state: chromeState.topBarState)
+        updateTopBarConstraints(for: chromeState.topBarState)
+        renderedBottomSheetState = chromeState.bottomSheetState
+        updateBottomSheetBottomConstraint()
         bottomSheetView.render(state: chromeState.bottomSheetState, animated: animated)
     }
 
