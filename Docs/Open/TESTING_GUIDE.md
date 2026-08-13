@@ -54,6 +54,34 @@ false alarm이 반복되면 테스트 suite를 믿지 않게 되고, 결국 실�
 ViewModel helper 분리만으로 깨지는 테스트는 좋은 테스트가 아닙니다.
 UIKit binding 방식 변경이나 repository 구현 교체에도 쉽게 깨지면 구현 detail에 묶였는지 봅니다.
 
+## 테스트 깊이와 관찰 경계
+
+외부 framework나 system component를 사용할 때는 앱이 소유한 규칙과 SDK 내부 동작을 나눠 봅니다.
+앱이 정한 정책은 결정적으로 테스트하고, adapter 연결은 production에서 실제로 노출하는 결과로 확인합니다.
+SDK 내부 구현까지 증명하려고 private 객체를 열거나 test-only API를 추가하지 않습니다.
+
+| 경계 | 테스트 방향 |
+| --- | --- |
+| 앱이 소유한 정책과 상태 전이 | unit test나 state test로 빠르고 결정적으로 검증합니다. |
+| 앱이 만든 adapter의 연결 | production output을 이용한 좁은 integration test를 둡니다. |
+| framework 내부 동작 | 앱 계약에 필요한 결과까지만 확인하고 exhaustive하게 다시 검증하지 않습니다. |
+| 아직 production 관찰 경계가 없는 동작 | 테스트를 위해 경계를 만들지 않고 후속 범위와 다시 열 조건을 기록합니다. |
+
+더 깊은 테스트가 항상 더 좋은 테스트는 아닙니다.
+private 접근, reflection, test-only initializer나 진단 API가 필요하다면 먼저 그 검증이 현재 제품 위험을 실제로 줄이는지 봅니다.
+현재 adapter가 보장해야 할 결과를 이미 확인했다면 framework 내부 관찰을 위해 production 구조를 넓히지 않습니다.
+
+검증을 미룰 때는 막연히 “나중에 테스트”라고만 적지 않습니다.
+
+- 지금 검증하는 앱 계약
+- 현재 범위에서 검증하지 않는 framework 내부 동작
+- 다시 검증을 열 제품 기능이나 위험
+- 그때 production에 생길 관찰 경계
+- 후속 테스트에서 확인할 결과
+
+기능이 확장되어 앱이 더 많은 lifecycle, 복구, bridge, telemetry를 소유하게 되면 테스트 범위도 함께 넓힙니다.
+반대로 앱 책임이 늘지 않았는데 테스트만 깊어지는 구조는 피합니다.
+
 ## Unit test의 단위
 
 Unit test의 단위는 class 하나가 아니라 behavior 하나입니다.
@@ -441,5 +469,7 @@ TDD 중에는 임시 테스트를 더 많이 둘 수 있습니다.
 - [ ] placeholder, subview hierarchy, constraint 같은 UI 존재 테스트를 PR에 남길 이유가 분명합니다.
 - [ ] asset 존재 여부나 pixel 크기를 unit test로 고정하지 않았습니다.
 - [ ] unit test를 위해 accessibility metadata나 view tag를 제품 코드에 추가하지 않았습니다.
+- [ ] framework 내부를 보기 위해 private 접근이나 test-only production API를 추가하지 않았습니다.
+- [ ] 이번에 미룬 검증이 있다면 다시 열 조건과 후속 테스트 범위를 기록했습니다.
 - [ ] TDD 중 임시 테스트와 오래 남길 regression 테스트를 구분했습니다.
 - [ ] 주석은 제품 이유를 설명할 때만 남겼습니다.
