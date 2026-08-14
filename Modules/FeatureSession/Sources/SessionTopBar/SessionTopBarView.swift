@@ -40,6 +40,13 @@ final class SessionTopBarView: UIView {
         nil
     }
 
+    override var intrinsicContentSize: CGSize {
+        let contentSize = contentStackView.systemLayoutSizeFitting(
+            UIView.layoutFittingCompressedSize
+        )
+        return CGSize(width: ceil(contentSize.width), height: Layout.height)
+    }
+
     private func configureHierarchy() {
         addSubview(contentStackView)
 
@@ -121,6 +128,8 @@ extension SessionTopBarView {
             addItemButton.isHidden = false
             toggleButton.setTitle("Collapse", for: .normal)
         }
+
+        invalidateIntrinsicContentSize()
     }
 }
 

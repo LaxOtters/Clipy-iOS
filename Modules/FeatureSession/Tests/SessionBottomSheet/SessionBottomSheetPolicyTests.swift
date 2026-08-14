@@ -163,6 +163,13 @@ final class SessionBottomSheetPolicyTests: XCTestCase {
         XCTAssertFalse(sut.isBrowserControlRowVisible(for: .expanded))
     }
 
+    func test_dockedKeyboardAvoidance_appliesOnlyToMinimizedAndPeek() {
+        XCTAssertFalse(SessionBottomSheetState.hidden.avoidsDockedKeyboard)
+        XCTAssertTrue(SessionBottomSheetState.minimized.avoidsDockedKeyboard)
+        XCTAssertTrue(SessionBottomSheetState.peek.avoidsDockedKeyboard)
+        XCTAssertFalse(SessionBottomSheetState.expanded.avoidsDockedKeyboard)
+    }
+
     private func dragEnded(
         endVisibleHeight: CGFloat,
         translationY: CGFloat,

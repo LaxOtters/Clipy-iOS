@@ -36,6 +36,8 @@ final class SessionViewModel {
     private let context: SessionLaunchContext
     private let chromeReducer: SessionChromeReducer
 
+    private static let defaultStartURL = URL(string: "https://google.com")!
+
     init(
         context: SessionLaunchContext,
         chromeReducer: SessionChromeReducer = SessionChromeReducer()
@@ -45,9 +47,10 @@ final class SessionViewModel {
     }
 
     func transform(input: Input) -> Output {
+        let effectiveStartURL = context.initialURL ?? Self.defaultStartURL
         let initialLoadURL = input.viewDidLoad
-            .compactMap { [initialURL = context.initialURL] in
-                initialURL
+            .map {
+                effectiveStartURL
             }
 
         let chromeState = chromeActions(from: input)

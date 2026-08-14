@@ -8,13 +8,8 @@
 import WebKit
 
 extension SessionWebView: WKNavigationDelegate {
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        emitState()
-    }
-
-    /// didFinish는 browser state 갱신과 chrome 복원 신호가 함께 필요한 지점입니다.
+    // 페이지 이동 완료를 기존 Session chrome 복원 입력으로 전달합니다.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        emitState()
         emitNavigationFinished()
     }
 
@@ -23,7 +18,6 @@ extension SessionWebView: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        emitState()
         emitNavigationFailure(
             .committed(SessionWebNavigationFailureContext(error: error))
         )
@@ -34,7 +28,6 @@ extension SessionWebView: WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        emitState()
         emitNavigationFailure(
             .provisional(SessionWebNavigationFailureContext(error: error))
         )

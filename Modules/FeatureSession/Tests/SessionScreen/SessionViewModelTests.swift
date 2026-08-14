@@ -46,7 +46,7 @@ final class SessionViewModelTests: XCTestCase {
         XCTAssertEqual(loadedURLs, [initialURL])
     }
 
-    func test_viewDidLoadWithoutInitialURL_doesNotEmitInitialURL_readyForEmptySession() {
+    func test_viewDidLoadWithoutInitialURL_emitsGoogleURL_readyForBrowsing() {
         let viewDidLoadRelay = PublishRelay<Void>()
         let output = Fixture.makeOutput(
             context: SessionLaunchContext(sessionId: UUID(), initialURL: nil),
@@ -60,7 +60,7 @@ final class SessionViewModelTests: XCTestCase {
 
         viewDidLoadRelay.accept(())
 
-        XCTAssertTrue(loadedURLs.isEmpty)
+        XCTAssertEqual(loadedURLs, [URL(string: "https://google.com")!])
     }
 
     func test_homeTap_emitsHomeRoute_forExplicitSessionExit() {

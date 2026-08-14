@@ -62,10 +62,31 @@ final class SessionViewController: UIViewController {
             )
         )
 
-        output.initialLoadURL
-            .emit(with: self) { owner, url in
-                owner.rootView.load(url: url)
+        rootView.rx.browserState
+            .drive(with: self) { owner, browserState in
+                owner.rootView.render(browserState: browserState)
             }
+            .disposed(by: disposeBag)
+
+        rootView.rx.backTap
+            .asSignal()
+            .emit(with: self, onNext: { owner, _ in
+                owner.rootView.goBack()
+            })
+            .disposed(by: disposeBag)
+
+        rootView.rx.forwardTap
+            .asSignal()
+            .emit(with: self, onNext: { owner, _ in
+                owner.rootView.goForward()
+            })
+            .disposed(by: disposeBag)
+
+        rootView.rx.reloadTap
+            .asSignal()
+            .emit(with: self, onNext: { owner, _ in
+                owner.rootView.reload()
+            })
             .disposed(by: disposeBag)
 
         output.chromeState
@@ -77,6 +98,13 @@ final class SessionViewController: UIViewController {
         output.route
             .emit(with: self) { owner, route in
                 owner.handle(route: route)
+            }
+            .disposed(by: disposeBag)
+
+        // WebView 이벤트 구독을 먼저 연결한 뒤 initial load를 시작해야 첫 navigation 상태 변화를 놓치지 않습니다.
+        output.initialLoadURL
+            .emit(with: self) { owner, url in
+                owner.rootView.load(url: url)
             }
             .disposed(by: disposeBag)
     }

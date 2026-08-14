@@ -7,15 +7,48 @@
 
 import Foundation
 
-/// WebView wrapper 밖에서 화면이 알아야 할 browser 상태만 남깁니다.
+/// Bottom Sheet의 브라우저 컨트롤 영역에 표시할 값입니다.
 struct SessionBrowserState: Equatable {
-    let currentURL: URL?
-    let isLoading: Bool
+    let urlDisplayText: String
     let canGoBack: Bool
+    let canGoForward: Bool
+    let canReload: Bool
+}
 
-    static let empty = SessionBrowserState(
-        currentURL: nil,
-        isLoading: false,
-        canGoBack: false
-    )
+struct SessionBrowserSnapshot: Equatable {
+    let url: URL?
+    let canGoBack: Bool
+    let canGoForward: Bool
+}
+
+struct SessionBrowserStateProjector {
+    private var lastURLDisplayText = ""
+
+    mutating func project(
+        snapshot: SessionBrowserSnapshot,
+        requestedURL: URL? = nil
+    ) -> SessionBrowserState {
+        if let displayURL = requestedURL ?? snapshot.url {
+            lastURLDisplayText = Self.displayText(for: displayURL)
+        }
+
+        return SessionBrowserState(
+            urlDisplayText: lastURLDisplayText,
+            canGoBack: snapshot.canGoBack,
+            canGoForward: snapshot.canGoForward,
+            canReload: snapshot.url != nil
+        )
+    }
+
+    private static func displayText(for url: URL) -> String {
+        guard let host = url.host else {
+            return url.absoluteString
+        }
+
+        guard host.lowercased().hasPrefix("www.") else {
+            return host
+        }
+
+        return String(host.dropFirst(4))
+    }
 }

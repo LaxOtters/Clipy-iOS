@@ -12,21 +12,22 @@ import RxCocoa
 import RxRelay
 import RxSwift
 
-/// Session 안의 WebKit detail을 감싸고, 밖으로는 FeatureSession에서 쓰는 event만 엽니다.
+/// 세션 화면에서 사용하는 WKWebView를 감싸고 브라우저 입력과 화면 표시값을 연결합니다.
 final class SessionWebView: UIView {
     private let webView: WKWebView
-    fileprivate let stateRelay = BehaviorRelay(value: SessionBrowserState.empty)
+    fileprivate let browserStateRelay = ReplayRelay<SessionBrowserState>.create(bufferSize: 1)
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
     fileprivate let navigationFinishedRelay = PublishRelay<Void>()
     private var observations: [NSKeyValueObservation] = []
     private let rootScrollAdapter = SessionWebRootScrollAdapter()
+    private var browserStateProjector = SessionBrowserStateProjector()
 
     override init(frame: CGRect) {
         webView = WKWebView(frame: .zero)
         super.init(frame: frame)
         configureView()
-        observeBrowserState()
+        observeBrowserStateChanges()
     }
 
     @available(*, unavailable)
@@ -52,26 +53,33 @@ final class SessionWebView: UIView {
         ])
     }
 
-    private func observeBrowserState() {
+    private func observeBrowserStateChanges() {
         observations = [
             webView.observe(\.url, options: [.new]) { [weak self] _, _ in
-                self?.emitState()
-            },
-            webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in
-                self?.emitState()
+                self?.emitBrowserState()
             },
             webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
-                self?.emitState()
+                self?.emitBrowserState()
+            },
+            webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in
+                self?.emitBrowserState()
             }
         ]
     }
 
-    func emitState() {
-        stateRelay.accept(
-            SessionBrowserState(
-                currentURL: webView.url,
-                isLoading: webView.isLoading,
-                canGoBack: webView.canGoBack
+    private var currentBrowserSnapshot: SessionBrowserSnapshot {
+        SessionBrowserSnapshot(
+            url: webView.url,
+            canGoBack: webView.canGoBack,
+            canGoForward: webView.canGoForward
+        )
+    }
+
+    private func emitBrowserState(requestedURL: URL? = nil) {
+        browserStateRelay.accept(
+            browserStateProjector.project(
+                snapshot: currentBrowserSnapshot,
+                requestedURL: requestedURL
             )
         )
     }
@@ -131,12 +139,14 @@ extension SessionWebView {
         webView.url
     }
 
-    var canGoBack: Bool {
-        webView.canGoBack
-    }
-
     func load(url: URL) {
-        webView.load(URLRequest(url: url))
+        emitBrowserState(requestedURL: url)
+
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url)
+        } else {
+            webView.load(URLRequest(url: url))
+        }
     }
 
     func goBack() {
@@ -146,13 +156,31 @@ extension SessionWebView {
 
         webView.goBack()
     }
+
+    func goForward() {
+        guard webView.canGoForward else {
+            return
+        }
+
+        webView.goForward()
+    }
+
+    func reload() {
+        guard webView.url != nil else {
+            return
+        }
+
+        webView.reload()
+    }
 }
 
 // MARK: - Reactive
 
 extension Reactive where Base: SessionWebView {
-    var state: Driver<SessionBrowserState> {
-        base.stateRelay.asDriver()
+    var browserState: Driver<SessionBrowserState> {
+        base.browserStateRelay
+            .distinctUntilChanged()
+            .asDriver(onErrorDriveWith: .empty())
     }
 
     var navigationFailure: Signal<SessionWebNavigationFailure> {
@@ -164,7 +192,7 @@ extension Reactive where Base: SessionWebView {
         base.rootScrollRelay.asSignal()
     }
 
-    /// navigation finish를 Session chrome 흐름에서 쓸 수 있게 엽니다.
+    /// Navigation 완료 시점을 Session chrome 복원 흐름으로 내보냅니다.
     var navigationFinished: Signal<Void> {
         base.navigationFinishedRelay.asSignal()
     }

@@ -30,11 +30,11 @@ final class SessionBottomSheetView: UIView {
     private let grabberHitAreaView = UIView()
     private let grabberView = UIView()
     private let browserControlRowStackView = UIStackView()
-    private let previousButton = UIButton(type: .system)
-    private let nextButton = UIButton(type: .system)
+    private let backButton = UIButton(type: .system)
+    private let forwardButton = UIButton(type: .system)
     private let urlContainerView = UIView()
     private let urlLabel = UILabel()
-    private let refreshButton = UIButton(type: .system)
+    private let reloadButton = UIButton(type: .system)
     private let peekTitleLabel = UILabel()
     private let peekDescriptionLabel = UILabel()
     private let peekContentStackView = UIStackView()
@@ -46,6 +46,7 @@ final class SessionBottomSheetView: UIView {
     private var renderedState: SessionBottomSheetState = .peek
     private var currentOffset: CGFloat = 0
     private var dragStartOffset: CGFloat = 0
+    private var lastLayoutSize: CGSize = .zero
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -62,6 +63,12 @@ final class SessionBottomSheetView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+
+        guard bounds.size != lastLayoutSize else {
+            return
+        }
+
+        lastLayoutSize = bounds.size
         render(state: renderedState, animated: false)
     }
 
@@ -72,10 +79,10 @@ final class SessionBottomSheetView: UIView {
         addSubview(expandedContentStackView)
 
         grabberHitAreaView.addSubview(grabberView)
-        browserControlRowStackView.addArrangedSubview(previousButton)
-        browserControlRowStackView.addArrangedSubview(nextButton)
+        browserControlRowStackView.addArrangedSubview(backButton)
+        browserControlRowStackView.addArrangedSubview(forwardButton)
         browserControlRowStackView.addArrangedSubview(urlContainerView)
-        browserControlRowStackView.addArrangedSubview(refreshButton)
+        browserControlRowStackView.addArrangedSubview(reloadButton)
         urlContainerView.addSubview(urlLabel)
         peekContentStackView.addArrangedSubview(peekTitleLabel)
         peekContentStackView.addArrangedSubview(peekDescriptionLabel)
@@ -95,28 +102,7 @@ final class SessionBottomSheetView: UIView {
         grabberView.backgroundColor = .tertiaryLabel
         grabberView.layer.cornerRadius = Layout.grabberHeight / 2
 
-        browserControlRowStackView.axis = .horizontal
-        browserControlRowStackView.alignment = .center
-        browserControlRowStackView.spacing = 8
-        browserControlRowStackView.layoutMargins = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
-        browserControlRowStackView.isLayoutMarginsRelativeArrangement = true
-
-        previousButton.setTitle("‹", for: .normal)
-        previousButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
-
-        nextButton.setTitle("›", for: .normal)
-        nextButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
-
-        urlContainerView.backgroundColor = .tertiarySystemBackground
-        urlContainerView.layer.cornerRadius = 12
-
-        urlLabel.text = "Search or enter URL"
-        urlLabel.font = .preferredFont(forTextStyle: .subheadline)
-        urlLabel.textColor = .secondaryLabel
-        urlLabel.lineBreakMode = .byTruncatingMiddle
-
-        refreshButton.setTitle("↻", for: .normal)
-        refreshButton.titleLabel?.font = .preferredFont(forTextStyle: .title3)
+        configureBrowserControls()
 
         [peekContentStackView, expandedContentStackView].forEach {
             $0.axis = .vertical
@@ -146,11 +132,34 @@ final class SessionBottomSheetView: UIView {
 
         accessibilityIdentifier = "sessionBottomSheet"
         browserControlRowStackView.accessibilityIdentifier = "sessionBottomSheet.browserControls"
-        previousButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.previous"
-        nextButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.next"
+        backButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.previous"
+        forwardButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.next"
         urlLabel.accessibilityIdentifier = "sessionBottomSheet.browserControls.url"
-        refreshButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.refresh"
+        reloadButton.accessibilityIdentifier = "sessionBottomSheet.browserControls.refresh"
         peekContentStackView.accessibilityIdentifier = "sessionBottomSheet.peekEmptyState"
+    }
+
+    private func configureBrowserControls() {
+        browserControlRowStackView.axis = .horizontal
+        browserControlRowStackView.alignment = .center
+        browserControlRowStackView.spacing = 8
+        browserControlRowStackView.layoutMargins = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
+        browserControlRowStackView.isLayoutMarginsRelativeArrangement = true
+
+        backButton.setTitle("‹", for: .normal)
+        backButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
+        forwardButton.setTitle("›", for: .normal)
+        forwardButton.titleLabel?.font = .preferredFont(forTextStyle: .title2)
+
+        urlContainerView.backgroundColor = .tertiarySystemBackground
+        urlContainerView.layer.cornerRadius = 12
+        urlLabel.text = "Search or enter URL"
+        urlLabel.font = .preferredFont(forTextStyle: .subheadline)
+        urlLabel.textColor = .secondaryLabel
+        urlLabel.lineBreakMode = .byTruncatingMiddle
+
+        reloadButton.setTitle("↻", for: .normal)
+        reloadButton.titleLabel?.font = .preferredFont(forTextStyle: .title3)
     }
 
     private func configureGesture() {
@@ -264,6 +273,18 @@ final class SessionBottomSheetView: UIView {
 // MARK: - Interface
 
 extension SessionBottomSheetView {
+    fileprivate var backTap: ControlEvent<Void> {
+        backButton.rx.tap
+    }
+
+    fileprivate var forwardTap: ControlEvent<Void> {
+        forwardButton.rx.tap
+    }
+
+    fileprivate var reloadTap: ControlEvent<Void> {
+        reloadButton.rx.tap
+    }
+
     /// Peek/Expanded content를 동시에 보여줄지, detent 기준으로 끊어 보여줄지 정합니다.
     var isContentFadeEnabled: Bool {
         get { policy.isContentFadeEnabled }
@@ -280,6 +301,13 @@ extension SessionBottomSheetView {
         setOffset(policy.offset(for: state, availableHeight: bounds.height), animated: animated)
     }
 
+    func render(browserState: SessionBrowserState) {
+        urlLabel.text = browserState.urlDisplayText
+        backButton.isEnabled = browserState.canGoBack
+        forwardButton.isEnabled = browserState.canGoForward
+        reloadButton.isEnabled = browserState.canReload
+    }
+
     /// 현재 화면 크기에서 해당 상태가 실제로 차지하는 높이입니다.
     func visibleHeight(for state: SessionBottomSheetState) -> CGFloat {
         policy.visibleHeight(for: state, availableHeight: bounds.height)
@@ -289,6 +317,18 @@ extension SessionBottomSheetView {
 // MARK: - Reactive
 
 extension Reactive where Base: SessionBottomSheetView {
+    var backTap: ControlEvent<Void> {
+        base.backTap
+    }
+
+    var forwardTap: ControlEvent<Void> {
+        base.forwardTap
+    }
+
+    var reloadTap: ControlEvent<Void> {
+        base.reloadTap
+    }
+
     /// grabber에서 끝난 drag를 ViewModel 입력으로 엽니다.
     var dragEnded: Signal<SessionBottomSheetAction> {
         base.dragEndedRelay.asSignal()
