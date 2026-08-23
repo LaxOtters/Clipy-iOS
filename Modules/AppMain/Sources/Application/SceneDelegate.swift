@@ -9,7 +9,7 @@ import UIKit
 
 import FeatureSession
 
-/// 앱 window를 만들고 현재 root navigation 흐름을 시작합니다.
+/// 앱 window에 root navigation과 overlay host를 붙이고, scene lifecycle을 화면 흐름에 전달합니다.
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private static let isSplashCrossDissolveEnabled = true
 
@@ -17,6 +17,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private var homeViewController: UIViewController?
     private var navigationController: AppMainNavigationController?
+    private var overlayContainerViewController: AppOverlayContainerViewController?
+    private var overlayCoordinator: AppOverlayCoordinator?
     private var splashStateMachine: AppSplashLifecycleStateMachine?
     private var splashViewController: AppSplashViewController?
 
@@ -49,14 +51,28 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         navigationController.setNavigationBarHidden(true, animated: false)
-        window.rootViewController = navigationController
+        let overlayContainerViewController = AppOverlayContainerViewController(
+            contentViewController: navigationController
+        )
+        window.rootViewController = overlayContainerViewController
         window.makeKeyAndVisible()
+        let overlayCoordinator = AppOverlayCoordinator(
+            host: overlayContainerViewController,
+            isSceneActive: windowScene.activationState == .foregroundActive
+        )
+        overlayContainerViewController.setHostDetachHandler { [weak overlayCoordinator] in
+            overlayCoordinator?.hostDidDetach()
+        }
         self.window = window
         self.homeViewController = homeViewController
         self.navigationController = navigationController
+        self.overlayContainerViewController = overlayContainerViewController
+        self.overlayCoordinator = overlayCoordinator
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        overlayCoordinator?.sceneDidBecomeActive()
+
         guard splashStateMachine != nil else {
             return
         }
@@ -72,11 +88,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
+        overlayCoordinator?.sceneWillResignActive()
+
         guard splashStateMachine != nil else {
             return
         }
 
         executeSplashCommand(handleSplashEvent(.becameInactive))
+    }
+
+    func sceneDidDisconnect(_ scene: UIScene) {
+        overlayCoordinator?.shutdown()
+        overlayCoordinator = nil
+        overlayContainerViewController = nil
     }
 
     private func claimProcessSplashPresentation() -> Bool {
