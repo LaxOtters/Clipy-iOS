@@ -9,8 +9,7 @@ import Foundation
 
 import CoreDesignSystem
 
-/// 한 scene에서 Dialog는 하나만, Snackbar는 들어온 순서대로 보여줍니다.
-/// scene이나 host 상태가 바뀌면 진행 중인 overlay를 여기서 정리합니다.
+/// 한 scene의 Dialog, Snackbar 순서와 scene/host 종료를 함께 관리합니다.
 @MainActor
 final class AppOverlayCoordinator: ClipyOverlayRequesting {
     private static let snackbarDuration: TimeInterval = 2
@@ -54,7 +53,7 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
             return .rejected(.hostUnavailable)
         }
         let token = UUID()
-        dialog = DialogState(token: token, response: response, phase: .entering)
+        dialog = DialogState(token: token, response: response, ownsHostedView: true, phase: .entering)
         host.mountDialog(
             configuration: configuration,
             onSelection: { [weak self] selection, promptText in
@@ -140,6 +139,7 @@ private extension AppOverlayCoordinator {
     struct DialogState {
         let token: UUID
         let response: @MainActor (ClipyDialog.Response) -> Void
+        var ownsHostedView: Bool
         var phase: DialogPhase
     }
     struct SnackbarFingerprint: Hashable {
@@ -184,13 +184,15 @@ private extension AppOverlayCoordinator {
         case .displayed:
             dialog?.phase = .visible
         case .unavailable, .occupied:
-            let removalHost = result == .unavailable ? host : nil
+            let ownsHostedView = result == .unavailable
+            dialog?.ownsHostedView = ownsHostedView
+            dialog?.phase = .exiting(.cancelled(.displayFailed))
+            let removalHost = ownsHostedView ? host : nil
             // 동기 실패에서도 .accepted를 먼저 반환하고, occupied host의 incumbent는 건드리지 않습니다.
-            Task { @MainActor [self] in
-                guard let current = dialog, current.token == token, case .entering = current.phase else {
+            DispatchQueue.main.async { [self] in
+                guard let current = dialog, current.token == token, case .exiting = current.phase else {
                     return
                 }
-                dialog?.phase = .exiting(.cancelled(.displayFailed))
                 requestDialogRemoval(token: token, animated: false, removalHost: removalHost)
             }
         }
@@ -210,7 +212,7 @@ private extension AppOverlayCoordinator {
             )
         case .exiting:
             // 사용자가 이미 고른 결과는 뒤늦게 들어온 scene/host 종료로 덮지 않습니다.
-            guard let removalHost else {
+            guard current.ownsHostedView, let removalHost else {
                 return
             }
             requestDialogRemoval(token: current.token, animated: false, removalHost: removalHost)
@@ -352,8 +354,6 @@ private extension AppOverlayCoordinator {
         snackbarFingerprints = [current.fingerprint]
         let wasExiting: Bool
         switch current.phase {
-        case .exiting(.action):
-            wasExiting = true
         case .entering, .visible:
             wasExiting = false
             // 아직 누르지 않은 action은 scene 정리와 함께 버립니다.

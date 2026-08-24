@@ -46,6 +46,7 @@ final class OverlayHostSpy: AppOverlayHosting {
     var dialogUnmountAnimations: [Bool] = []
     var snackbarUnmountAnimations: [Bool] = []
     private(set) var events: [String] = []
+    var onDialogUnmountRequested: (() -> Void)?
     var outsideTapHandler: (() -> Void)?
     var hostDetachHandler: (() -> Void)?
 
@@ -95,6 +96,7 @@ final class OverlayHostSpy: AppOverlayHosting {
         mountedDialogCount = 0
         events.append("dialogUnmountRequested")
         dialogUnmountAnimations.append(animated)
+        onDialogUnmountRequested?()
         if defersDialogUnmount {
             dialogUnmountCompletions.append(completion)
         } else {

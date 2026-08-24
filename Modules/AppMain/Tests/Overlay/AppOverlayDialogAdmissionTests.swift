@@ -18,43 +18,51 @@ final class AppOverlayDialogAdmissionTests: XCTestCase {
         var requestDidReturn = false
         var responseBeforeReturn: Bool?
         var responses: [ClipyDialog.Response] = []
+        let responseDelivered = expectation(description: "Display failure response delivered")
 
         let requestResult = coordinator.presentDialog(overlayDialogConfiguration) { response in
             responseBeforeReturn = !requestDidReturn
             responses.append(response)
+            responseDelivered.fulfill()
         }
         requestDidReturn = true
 
         XCTAssertEqual(requestResult, .accepted)
         XCTAssertTrue(responses.isEmpty)
 
-        await Task.yield()
+        await fulfillment(of: [responseDelivered], timeout: 1)
 
         XCTAssertEqual(responseBeforeReturn, false)
         XCTAssertEqual(responses, [.cancelled(.displayFailed)])
     }
 
-    func test_occupiedHost_keepsIncumbentDialog_andFailsSecondCoordinatorAfterAdmission() async {
+    func test_occupiedHost_lifecycleBeforeDeferredResponse_keepsIncumbentDialog() async {
         let host = OverlayHostSpy()
         let firstCoordinator = makeOverlayCoordinator(host: host)
         let secondCoordinator = makeOverlayCoordinator(host: host)
         var firstResponses: [ClipyDialog.Response] = []
         var secondResponses: [ClipyDialog.Response] = []
+        let secondResponseDelivered = expectation(description: "Occupied response delivered")
 
         XCTAssertEqual(
             firstCoordinator.presentDialog(overlayDialogConfiguration) { firstResponses.append($0) },
             .accepted
         )
         XCTAssertEqual(
-            secondCoordinator.presentDialog(overlayDialogConfiguration) { secondResponses.append($0) },
+            secondCoordinator.presentDialog(overlayDialogConfiguration) { response in
+                secondResponses.append(response)
+                secondResponseDelivered.fulfill()
+            },
             .accepted
         )
+
+        secondCoordinator.shutdown()
 
         XCTAssertEqual(host.mountedDialogCount, 1)
         XCTAssertEqual(host.dialogCallbacks.count, 1)
         XCTAssertTrue(secondResponses.isEmpty)
 
-        await Task.yield()
+        await fulfillment(of: [secondResponseDelivered], timeout: 1)
 
         XCTAssertEqual(secondResponses, [.cancelled(.displayFailed)])
         XCTAssertEqual(host.mountedDialogCount, 1)

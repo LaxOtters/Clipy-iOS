@@ -120,6 +120,8 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         var responses: [ClipyDialog.Response] = []
         var reentrantRequestResult: ClipyDialog.RequestResult?
         weak var weakSentinel: LifetimeSentinel?
+        let unmountRequested = expectation(description: "Dialog unmount requested")
+        host.onDialogUnmountRequested = { unmountRequested.fulfill() }
 
         do {
             let sentinel = LifetimeSentinel()
@@ -139,7 +141,8 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         )
         XCTAssertNotNil(weakSentinel)
 
-        await Task.yield()
+        await fulfillment(of: [unmountRequested], timeout: 1)
+        host.onDialogUnmountRequested = nil
 
         host.completeDialogUnmount(at: 0)
 
