@@ -12,22 +12,23 @@ import UIKit
 @MainActor
 public final class ClipySnackbarView: UIControl {
     private let messageLabel = UILabel()
-    private let actionButton = UIButton(type: .system)
+    private let actionButton = SnackbarActionButton(type: .system)
     private let contentStack = UIStackView()
-    private let onAction: (() -> Void)?
     private let onDismiss: () -> Void
+    private lazy var messageVerticalWidthConstraint = messageLabel.widthAnchor.constraint(
+        equalTo: contentStack.widthAnchor
+    )
 
     public init(
         message: String,
         action: ClipySnackbar.Action?,
         onDismiss: @escaping () -> Void
     ) {
-        self.onAction = action?.handler
         self.onDismiss = onDismiss
         super.init(frame: .zero)
 
         configureBackground()
-        configureContent(message: message, actionTitle: action?.title)
+        configureContent(message: message, action: action)
         addTarget(self, action: #selector(didTapBody), for: .touchUpInside)
     }
 
@@ -35,7 +36,9 @@ public final class ClipySnackbarView: UIControl {
         super.layoutSubviews()
 
         guard !actionButton.isHidden else {
+            messageVerticalWidthConstraint.isActive = false
             contentStack.axis = .horizontal
+            contentStack.alignment = .center
             return
         }
 
@@ -43,10 +46,12 @@ public final class ClipySnackbarView: UIControl {
         let requiredWidth = messageSingleLineWidth
             + actionButton.intrinsicContentSize.width
             + 12
-        let usesVerticalLayout = requiredWidth > availableWidth
+        let usesVerticalLayout = messageContainsExplicitLineBreak
+            || requiredWidth > availableWidth
+        messageVerticalWidthConstraint.isActive = usesVerticalLayout
         messageLabel.numberOfLines = usesVerticalLayout ? 0 : 1
         contentStack.axis = usesVerticalLayout ? .vertical : .horizontal
-        contentStack.alignment = usesVerticalLayout ? .fill : .center
+        contentStack.alignment = usesVerticalLayout ? .trailing : .center
         contentStack.spacing = usesVerticalLayout ? 8 : 12
     }
 
@@ -77,6 +82,10 @@ public final class ClipySnackbarView: UIControl {
 private extension ClipySnackbarView {
     var messageSingleLineWidth: CGFloat {
         ceil(messageLabel.attributedText?.size().width ?? 0)
+    }
+
+    var messageContainsExplicitLineBreak: Bool {
+        messageLabel.attributedText?.string.rangeOfCharacter(from: .newlines) != nil
     }
 
     func configureBackground() {
@@ -114,7 +123,7 @@ private extension ClipySnackbarView {
         ])
     }
 
-    func configureContent(message: String, actionTitle: String?) {
+    func configureContent(message: String, action: ClipySnackbar.Action?) {
         messageLabel.numberOfLines = 0
         messageLabel.isUserInteractionEnabled = false
         ClipyTypography.body1Medium.apply(
@@ -126,18 +135,24 @@ private extension ClipySnackbarView {
         actionButton.contentHorizontalAlignment = .trailing
         actionButton.configuration = .plain()
         actionButton.configuration?.contentInsets = .zero
-        actionButton.addTarget(self, action: #selector(didTapAction), for: .touchUpInside)
+        actionButton.configuration?.titleLineBreakMode = .byTruncatingTail
+        actionButton.titleLabel?.numberOfLines = 1
+        actionButton.titleLabel?.lineBreakMode = .byTruncatingTail
 
-        if let actionTitle {
+        if let action {
             actionButton.isHidden = false
             actionButton.setAttributedTitle(
                 ClipyTypography.body1SemiBold.attributedString(
-                    actionTitle,
+                    action.title,
                     color: ClipyColor.Foundation.primary300,
                     alignment: .right,
                     lineBreakMode: .byTruncatingTail
                 ),
                 for: .normal
+            )
+            actionButton.addAction(
+                UIAction { _ in action.handler() },
+                for: .touchUpInside
             )
         } else {
             actionButton.isHidden = true
@@ -156,19 +171,33 @@ private extension ClipySnackbarView {
             contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             contentStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 349)
+            widthAnchor.constraint(lessThanOrEqualToConstant: 349),
+            actionButton.widthAnchor.constraint(lessThanOrEqualTo: contentStack.widthAnchor)
         ])
 
         messageLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        actionButton.setContentHuggingPriority(.required, for: .horizontal)
-        actionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        actionButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        actionButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     }
 
     @objc func didTapBody() {
         onDismiss()
     }
+}
 
-    @objc func didTapAction() {
-        onAction?()
+private final class SnackbarActionButton: UIButton {
+    private let minimumHitSize = CGSize(width: 44, height: 44)
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard isUserInteractionEnabled,
+              !isHidden,
+              alpha > 0.01 else {
+            return false
+        }
+
+        // 짧은 action도 주변 여백까지 같은 control로 처리하되, 영역 밖 drag-out은 UIKit에 맡깁니다.
+        let horizontalInset = min((bounds.width - minimumHitSize.width) / 2, 0)
+        let verticalInset = min((bounds.height - minimumHitSize.height) / 2, 0)
+        return bounds.insetBy(dx: horizontalInset, dy: verticalInset).contains(point)
     }
 }

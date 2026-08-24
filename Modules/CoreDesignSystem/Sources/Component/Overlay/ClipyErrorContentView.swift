@@ -76,7 +76,12 @@ private extension ClipyErrorContentView {
         textStack.alignment = .fill
         textStack.spacing = 10
 
-        let contentStack = UIStackView(arrangedSubviews: [imageView, textStack])
+        let detailsScrollView = makeDetailsScrollView(
+            imageView: imageView,
+            textStack: textStack
+        )
+
+        let contentStack = UIStackView(arrangedSubviews: [detailsScrollView])
         contentStack.axis = .vertical
         contentStack.alignment = .center
         contentStack.spacing = 30
@@ -88,11 +93,45 @@ private extension ClipyErrorContentView {
         }
 
         NSLayoutConstraint.activate([
+            detailsScrollView.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             contentStack.centerXAnchor.constraint(equalTo: centerXAnchor),
             contentStack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
-            contentStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20)
+            contentStack.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 20),
+            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            contentStack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -20)
         ])
+    }
+
+    func makeDetailsScrollView(
+        imageView: UIImageView,
+        textStack: UIStackView
+    ) -> UIScrollView {
+        let detailsStack = UIStackView(arrangedSubviews: [imageView, textStack])
+        detailsStack.axis = .vertical
+        detailsStack.alignment = .center
+        detailsStack.spacing = 30
+        detailsStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let scrollView = UIScrollView()
+        scrollView.alwaysBounceVertical = false
+        scrollView.showsVerticalScrollIndicator = true
+        scrollView.addSubview(detailsStack)
+
+        let naturalHeight = scrollView.heightAnchor.constraint(equalTo: detailsStack.heightAnchor)
+        naturalHeight.priority = UILayoutPriority(749)
+
+        NSLayoutConstraint.activate([
+            detailsStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            detailsStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            detailsStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            detailsStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            detailsStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            textStack.widthAnchor.constraint(equalTo: detailsStack.widthAnchor),
+            naturalHeight
+        ])
+
+        return scrollView
     }
 
     func addActionButton(_ action: Action, to contentStack: UIStackView) {

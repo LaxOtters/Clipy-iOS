@@ -66,6 +66,32 @@ final class ClipyOverlayContractTests: XCTestCase {
         XCTAssertEqual(actionCount, 1)
     }
 
+    func test_snackbarActionTouchArea_routesOnlyAction_outsideVisibleButtonBounds() throws {
+        var actionCount = 0
+        var dismissCount = 0
+        let snackbar = ClipySnackbarView(
+            message: "Couldn’t load this page.",
+            action: .init(title: "Try again") { actionCount += 1 },
+            onDismiss: { dismissCount += 1 }
+        )
+        snackbar.frame = CGRect(x: 0, y: 0, width: 349, height: 48)
+        snackbar.layoutIfNeeded()
+
+        let actionButton = try snackbar.button(titled: "Try again")
+        let actionFrame = actionButton.convert(actionButton.bounds, to: snackbar)
+        let pointBelowButton = CGPoint(
+            x: actionFrame.midX,
+            y: min(snackbar.bounds.maxY - 1, actionFrame.maxY + 8)
+        )
+
+        XCTAssertFalse(actionFrame.contains(pointBelowButton))
+        let actionTarget = try XCTUnwrap(snackbar.hitTest(pointBelowButton, with: nil) as? UIControl)
+        actionTarget.sendActions(for: .touchUpInside)
+
+        XCTAssertEqual(actionCount, 1)
+        XCTAssertEqual(dismissCount, 0)
+    }
+
 }
 
 private extension UIView {
