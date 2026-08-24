@@ -54,9 +54,9 @@ final class OverlayHostSpy: AppOverlayHosting {
     private let defersSnackbarMount: Bool
     private let defersSnackbarUnmount: Bool
     private var dialogMountCompletions: [(AppOverlayMountResult) -> Void] = []
-    private var dialogUnmountCompletions: [() -> Void] = []
+    private var dialogUnmountCompletions: [(() -> Void)?] = []
     private var snackbarMountCompletions: [(AppOverlayMountResult) -> Void] = []
-    private var snackbarUnmountCompletions: [() -> Void] = []
+    private var snackbarUnmountCompletions: [(() -> Void)?] = []
 
     init(
         isAvailable: Bool = true,
@@ -144,12 +144,16 @@ final class OverlayHostSpy: AppOverlayHosting {
 
     func completeDialogUnmount(at index: Int) {
         events.append("dialogUnmountCompleted")
-        dialogUnmountCompletions[index]()
+        let completion = dialogUnmountCompletions[index]
+        dialogUnmountCompletions[index] = nil
+        completion?()
     }
 
     func completeSnackbarUnmount(at index: Int) {
         events.append("snackbarUnmountCompleted")
-        snackbarUnmountCompletions[index]()
+        let completion = snackbarUnmountCompletions[index]
+        snackbarUnmountCompletions[index] = nil
+        completion?()
     }
 
     func completeSnackbarMount(at index: Int, didDisplay: Bool) {

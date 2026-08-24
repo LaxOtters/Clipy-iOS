@@ -248,8 +248,8 @@ private extension AppOverlayCoordinator {
             completeDialogRemoval(token: token)
             return
         }
-        removalHost.unmountDialog(animated: animated) { [weak self] in
-            self?.completeDialogRemoval(token: token)
+        removalHost.unmountDialog(animated: animated) { [self] in
+            completeDialogRemoval(token: token)
         }
     }
 
@@ -370,8 +370,8 @@ private extension AppOverlayCoordinator {
             completeSnackbarRemoval(token: token)
             return
         }
-        removalHost.unmountSnackbar(animated: animated) { [weak self] in
-            self?.completeSnackbarRemoval(token: token)
+        removalHost.unmountSnackbar(animated: animated) { [self] in
+            completeSnackbarRemoval(token: token)
         }
     }
 
