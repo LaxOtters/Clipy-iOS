@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Dialog 구성과 요청 결과처럼 Dialog에서만 쓰는 값을 한곳에 모읍니다.
+/// Dialog를 요청하고 응답을 받을 때 쓰는 public 타입을 묶습니다.
 public enum ClipyDialog {
     public enum SemanticIcon: Equatable {
         case error

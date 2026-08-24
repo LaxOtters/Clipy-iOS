@@ -28,7 +28,7 @@ public final class ClipyButton: UIButton {
         CGSize(width: UIView.noIntrinsicMetric, height: variant.height)
     }
 
-    /// public variant를 늘리지 않고 특정 화면의 primary token만 바꿀 때 씁니다.
+    /// 공개 variant를 늘리지 않고 특정 화면의 primary 색만 바꿀 때 씁니다.
     enum ColorRole {
         case standard
         case primary500

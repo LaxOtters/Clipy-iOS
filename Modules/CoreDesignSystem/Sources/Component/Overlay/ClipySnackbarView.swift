@@ -44,7 +44,7 @@ public final class ClipySnackbarView: UIControl {
     ) -> CGSize {
         let fittingWidth = targetSize.width.isFinite && targetSize.width > 0
             ? targetSize.width
-            : max(bounds.width, 349)
+            : (bounds.width > 0 ? bounds.width : 349)
         updateLayoutMode(for: fittingWidth)
 
         return super.systemLayoutSizeFitting(
@@ -75,7 +75,6 @@ private extension ClipySnackbarView {
     }
 
     func configureBackground() {
-        clipsToBounds = false
         layer.cornerRadius = 8
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.1
@@ -223,9 +222,8 @@ private extension ClipySnackbarView {
         guard !actionButton.isHidden else { return .contentOnly }
         guard width > 0 else { return layoutMode ?? .horizontalAction }
 
-        let requiredWidth = 16
-            + messageSingleLineWidth
-            + actionButton.intrinsicContentSize.width
+        let actionWidth = max(44, actionButton.intrinsicContentSize.width)
+        let requiredWidth = 16 + messageSingleLineWidth + actionWidth
         return messageContainsExplicitLineBreak || requiredWidth > width
             ? .verticalAction
             : .horizontalAction

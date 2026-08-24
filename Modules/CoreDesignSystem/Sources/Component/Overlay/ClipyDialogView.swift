@@ -142,7 +142,7 @@ private extension ClipyDialogView {
             var arrangedSubviews: [UIView] = []
             if let image = CoreDesignSystemImage.dialogRequestSource {
                 let imageView = UIImageView(image: image)
-                imageView.contentMode = .center
+                imageView.contentMode = .scaleAspectFit
                 imageView.translatesAutoresizingMaskIntoConstraints = false
 
                 let imageContainer = UIView()

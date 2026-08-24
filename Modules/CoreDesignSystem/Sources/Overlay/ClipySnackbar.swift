@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Snackbar 요청과 queue 접수 결과처럼 Snackbar에서만 쓰는 값을 한곳에 모읍니다.
+/// Snackbar를 요청하고 queue 결과를 확인할 때 쓰는 public 타입을 묶습니다.
 public enum ClipySnackbar {
     /// Snackbar 버튼의 title과 탭했을 때 실행할 action입니다.
     public struct Action {
