@@ -82,14 +82,12 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
         configuration: ClipyDialog.Configuration,
         onSelection: @escaping (ClipyDialog.Selection, String?) -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
-    ) {
+    ) -> AppOverlayMountAdmission {
         guard isOverlayHostAvailable else {
-            completion(.unavailable)
-            return
+            return .unavailable
         }
         guard mountedDialog == nil else {
-            completion(.occupied)
-            return
+            return .occupied
         }
 
         let dialogView = ClipyDialogView(configuration: configuration, onSelection: onSelection)
@@ -102,9 +100,19 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
             constant: -40
         )
         preferredWidth.priority = .defaultHigh
+        let preferredVerticalCenter = dialogView.centerYAnchor.constraint(equalTo: dialogLayer.centerYAnchor)
+        preferredVerticalCenter.priority = .defaultLow
         NSLayoutConstraint.activate([
             dialogView.centerXAnchor.constraint(equalTo: dialogLayer.centerXAnchor),
-            dialogView.centerYAnchor.constraint(equalTo: dialogLayer.centerYAnchor),
+            preferredVerticalCenter,
+            dialogView.topAnchor.constraint(
+                greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor,
+                constant: 20
+            ),
+            dialogView.bottomAnchor.constraint(
+                lessThanOrEqualTo: view.keyboardLayoutGuide.topAnchor,
+                constant: -20
+            ),
             dialogView.leadingAnchor.constraint(greaterThanOrEqualTo: dialogLayer.leadingAnchor, constant: 20),
             dialogView.trailingAnchor.constraint(lessThanOrEqualTo: dialogLayer.trailingAnchor, constant: -20),
             dialogView.widthAnchor.constraint(lessThanOrEqualToConstant: 384),
@@ -124,6 +132,7 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
             let didDisplay = dialogView.superview === self.dialogLayer && self.mountedDialog === dialogView
             completion(didDisplay ? .displayed : .unavailable)
         }
+        return .accepted
     }
 
     func unmountDialog(animated: Bool, completion: @escaping () -> Void) {
@@ -162,14 +171,12 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
         onAction: (() -> Void)?,
         onDismiss: @escaping () -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
-    ) {
+    ) -> AppOverlayMountAdmission {
         guard isOverlayHostAvailable else {
-            completion(.unavailable)
-            return
+            return .unavailable
         }
         guard mountedSnackbar == nil else {
-            completion(.occupied)
-            return
+            return .occupied
         }
 
         let action = actionTitle.map { title in
@@ -211,6 +218,7 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
             let didDisplay = snackbarView.superview === self.snackbarLayer && self.mountedSnackbar === snackbarView
             completion(didDisplay ? .displayed : .unavailable)
         }
+        return .accepted
     }
 
     func unmountSnackbar(animated: Bool, completion: @escaping () -> Void) {
@@ -329,7 +337,7 @@ extension AppOverlayContainerViewController: UIGestureRecognizerDelegate {
     }
 }
 
-/// Snackbar가 없는 영역에서는 아래 화면이 그대로 터치를 받습니다.
+/// Snackbar view 밖의 터치는 아래 레이어로 넘깁니다.
 private final class PassthroughView: UIView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let target = super.hitTest(point, with: event)
@@ -344,7 +352,7 @@ private final class AppOverlayRootView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
 
-        // 처음에는 window가 nil이므로, 실제로 붙었던 root view가 떨어질 때만 detach로 봅니다.
+        // root view가 한 번 window에 붙은 뒤 떨어질 때만 detach로 봅니다.
         if window != nil {
             wasAttachedToWindow = true
         } else if wasAttachedToWindow {

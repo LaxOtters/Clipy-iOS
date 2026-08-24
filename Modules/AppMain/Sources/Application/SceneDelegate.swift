@@ -9,7 +9,8 @@ import UIKit
 
 import FeatureSession
 
-/// 앱 window에 root navigation과 overlay host를 붙이고, scene lifecycle을 화면 흐름에 전달합니다.
+/// 앱 window의 root에 navigation을 감싼 overlay container를 붙입니다.
+/// Scene 활성/비활성/종료 이벤트는 splash와 overlay coordinator에 나눠 전달합니다.
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private static let isSplashCrossDissolveEnabled = true
 

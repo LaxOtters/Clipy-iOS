@@ -62,25 +62,31 @@ final class AppOverlayContainerViewControllerTests: XCTestCase {
 
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(true) }
-        container.mountDialog(
-            configuration: overlayDialogConfiguration,
-            onSelection: { _, _ in },
-            completion: {
-                firstResult = $0
-                mounted.fulfill()
-            }
+        XCTAssertEqual(
+            container.mountDialog(
+                configuration: overlayDialogConfiguration,
+                onSelection: { _, _ in },
+                completion: {
+                    firstResult = $0
+                    mounted.fulfill()
+                }
+            ),
+            .accepted
         )
         await fulfillment(of: [mounted], timeout: 1)
         let incumbent = container.view.firstDescendant(of: ClipyDialogView.self)
 
-        container.mountDialog(
-            configuration: overlayDialogConfiguration,
-            onSelection: { _, _ in },
-            completion: { secondResult = $0 }
+        XCTAssertEqual(
+            container.mountDialog(
+                configuration: overlayDialogConfiguration,
+                onSelection: { _, _ in },
+                completion: { secondResult = $0 }
+            ),
+            .occupied
         )
 
         XCTAssertEqual(firstResult, .displayed)
-        XCTAssertEqual(secondResult, .occupied)
+        XCTAssertNil(secondResult)
         XCTAssertTrue(container.view.firstDescendant(of: ClipyDialogView.self) === incumbent)
 
         container.unmountDialog(animated: false) {}
@@ -100,29 +106,35 @@ final class AppOverlayContainerViewControllerTests: XCTestCase {
 
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(true) }
-        container.mountSnackbar(
-            message: "First",
-            actionTitle: nil,
-            onAction: nil,
-            onDismiss: {},
-            completion: {
-                firstResult = $0
-                mounted.fulfill()
-            }
+        XCTAssertEqual(
+            container.mountSnackbar(
+                message: "First",
+                actionTitle: nil,
+                onAction: nil,
+                onDismiss: {},
+                completion: {
+                    firstResult = $0
+                    mounted.fulfill()
+                }
+            ),
+            .accepted
         )
         await fulfillment(of: [mounted], timeout: 1)
         let incumbent = container.view.firstDescendant(of: ClipySnackbarView.self)
 
-        container.mountSnackbar(
-            message: "Second",
-            actionTitle: nil,
-            onAction: nil,
-            onDismiss: {},
-            completion: { secondResult = $0 }
+        XCTAssertEqual(
+            container.mountSnackbar(
+                message: "Second",
+                actionTitle: nil,
+                onAction: nil,
+                onDismiss: {},
+                completion: { secondResult = $0 }
+            ),
+            .occupied
         )
 
         XCTAssertEqual(firstResult, .displayed)
-        XCTAssertEqual(secondResult, .occupied)
+        XCTAssertNil(secondResult)
         XCTAssertTrue(container.view.firstDescendant(of: ClipySnackbarView.self) === incumbent)
 
         container.unmountSnackbar(animated: false) {}
