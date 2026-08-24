@@ -43,18 +43,14 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
         response: @escaping @MainActor (ClipyDialog.Response) -> Void
     ) -> ClipyDialog.RequestResult {
         // Dialog가 내려가는 중에도 아직 자리를 비운 게 아니므로, scene/host보다 중복 요청을 먼저 봅니다.
-        guard dialog == nil else {
-            return .rejected(.dialogAlreadyPresented)
-        }
-        guard isSceneActive else {
-            return .rejected(.sceneInactive)
-        }
+        guard dialog == nil else { return .rejected(.dialogAlreadyPresented) }
+        guard isSceneActive else { return .rejected(.sceneInactive) }
         guard !isShutdown, let host, host.isOverlayHostAvailable else {
             return .rejected(.hostUnavailable)
         }
         let token = UUID()
-        dialog = DialogState(token: token, response: response, ownsHostedView: true, phase: .entering)
-        host.mountDialog(
+        dialog = DialogState(token: token, response: response, ownsHostedView: false, phase: .entering)
+        let admission = host.mountDialog(
             configuration: configuration,
             onSelection: { [weak self] selection, promptText in
                 self?.beginDialogDismissal(
@@ -67,14 +63,18 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
                 self?.completeDialogEntry(token: token, result: result)
             }
         )
+        switch admission {
+        case .accepted:
+            dialog?.ownsHostedView = true
+        case .unavailable, .occupied:
+            failDialogEntry(token: token, ownsHostedView: false)
+        }
         return .accepted
     }
 
     @discardableResult
     func enqueueSnackbar(_ request: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
-        guard isSceneActive else {
-            return .unavailable(.sceneInactive)
-        }
+        guard isSceneActive else { return .unavailable(.sceneInactive) }
         guard !isShutdown, let host, host.isOverlayHostAvailable else {
             return .unavailable(.hostUnavailable)
         }
@@ -91,9 +91,7 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
     }
 
     func sceneDidBecomeActive() {
-        guard !isShutdown else {
-            return
-        }
+        guard !isShutdown else { return }
         isSceneActive = true
         showNextSnackbarIfNeeded()
     }
@@ -105,9 +103,7 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
     }
 
     func hostDidDetach() {
-        guard !isShutdown else {
-            return
-        }
+        guard !isShutdown else { return }
         let detachedHost = host
         detachedHost?.setHostDetachHandler(nil)
         host = nil
@@ -116,9 +112,7 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
     }
 
     func shutdown() {
-        guard !isShutdown else {
-            return
-        }
+        guard !isShutdown else { return }
         isShutdown = true
         isSceneActive = false
         let disconnectedHost = host
@@ -128,7 +122,6 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
         clearSnackbars(removalHost: disconnectedHost)
     }
 }
-
 private extension AppOverlayCoordinator {
     enum DialogPhase {
         case entering
@@ -183,18 +176,24 @@ private extension AppOverlayCoordinator {
         switch result {
         case .displayed:
             dialog?.phase = .visible
-        case .unavailable, .occupied:
-            let ownsHostedView = result == .unavailable
-            dialog?.ownsHostedView = ownsHostedView
-            dialog?.phase = .exiting(.cancelled(.displayFailed))
-            let removalHost = ownsHostedView ? host : nil
-            // 동기 실패에서도 .accepted를 먼저 반환하고, occupied host의 incumbent는 건드리지 않습니다.
-            DispatchQueue.main.async { [self] in
-                guard let current = dialog, current.token == token, case .exiting = current.phase else {
-                    return
-                }
-                requestDialogRemoval(token: token, animated: false, removalHost: removalHost)
+        case .unavailable:
+            failDialogEntry(token: token, ownsHostedView: true)
+        }
+    }
+
+    func failDialogEntry(token: UUID, ownsHostedView: Bool) {
+        guard let current = dialog, current.token == token, case .entering = current.phase else {
+            return
+        }
+        dialog?.ownsHostedView = ownsHostedView
+        dialog?.phase = .exiting(.cancelled(.displayFailed))
+        let removalHost = ownsHostedView ? host : nil
+        // 동기 실패에서도 .accepted를 먼저 반환하고, 승인받지 못한 host slot은 건드리지 않습니다.
+        DispatchQueue.main.async { [self] in
+            guard let current = dialog, current.token == token, case .exiting = current.phase else {
+                return
             }
+            requestDialogRemoval(token: token, animated: false, removalHost: removalHost)
         }
     }
 
@@ -212,9 +211,7 @@ private extension AppOverlayCoordinator {
             )
         case .exiting:
             // 사용자가 이미 고른 결과는 뒤늦게 들어온 scene/host 종료로 덮지 않습니다.
-            guard current.ownsHostedView, let removalHost else {
-                return
-            }
+            guard current.ownsHostedView, let removalHost else { return }
             requestDialogRemoval(token: current.token, animated: false, removalHost: removalHost)
         }
     }
@@ -285,7 +282,7 @@ private extension AppOverlayCoordinator {
             scheduledTask: nil,
             phase: .entering
         )
-        host.mountSnackbar(
+        let admission = host.mountSnackbar(
             message: pending.request.message,
             actionTitle: pending.request.action?.title,
             onAction: pending.request.action == nil ? nil : { [weak self] in
@@ -298,6 +295,12 @@ private extension AppOverlayCoordinator {
                 self?.completeSnackbarEntry(token: token, result: result)
             }
         )
+        switch admission {
+        case .accepted:
+            break
+        case .unavailable, .occupied:
+            clearSnackbars(removalHost: nil)
+        }
     }
 
     func completeSnackbarEntry(token: UUID, result: AppOverlayMountResult) {
@@ -312,9 +315,6 @@ private extension AppOverlayCoordinator {
             }
         case .unavailable:
             clearSnackbars(removalHost: host)
-        case .occupied:
-            // Host의 incumbent는 그 view를 올린 coordinator만 내릴 수 있습니다.
-            clearSnackbars(removalHost: nil)
         }
     }
 

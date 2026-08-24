@@ -77,10 +77,9 @@ final class OverlayHostSpy: AppOverlayHosting {
         configuration: ClipyDialog.Configuration,
         onSelection: @escaping (ClipyDialog.Selection, String?) -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
-    ) {
+    ) -> AppOverlayMountAdmission {
         guard mountedDialogCount == 0 else {
-            completion(.occupied)
-            return
+            return .occupied
         }
         mountedDialogCount = 1
         events.append("dialogMounted")
@@ -90,6 +89,7 @@ final class OverlayHostSpy: AppOverlayHosting {
         } else {
             dialogMountCompletions.append(completion)
         }
+        return .accepted
     }
 
     func unmountDialog(animated: Bool, completion: @escaping () -> Void) {
@@ -110,10 +110,9 @@ final class OverlayHostSpy: AppOverlayHosting {
         onAction: (() -> Void)?,
         onDismiss: @escaping () -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
-    ) {
+    ) -> AppOverlayMountAdmission {
         guard mountedSnackbarCount == 0 else {
-            completion(.occupied)
-            return
+            return .occupied
         }
         mountedSnackbarCount = 1
         snackbarMessages.append(message)
@@ -126,6 +125,7 @@ final class OverlayHostSpy: AppOverlayHosting {
         } else {
             completion(.displayed)
         }
+        return .accepted
     }
 
     func unmountSnackbar(animated: Bool, completion: @escaping () -> Void) {

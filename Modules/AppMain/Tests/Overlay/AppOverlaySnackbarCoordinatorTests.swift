@@ -27,6 +27,11 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         XCTAssertEqual(firstScheduler.tasks.count, 1)
         XCTAssertTrue(secondScheduler.tasks.isEmpty)
 
+        secondCoordinator.shutdown()
+
+        XCTAssertEqual(host.mountedSnackbarCount, 1)
+        XCTAssertTrue(host.snackbarUnmountAnimations.isEmpty)
+
         host.outsideTapHandler?()
 
         XCTAssertEqual(host.snackbarUnmountAnimations, [true])
