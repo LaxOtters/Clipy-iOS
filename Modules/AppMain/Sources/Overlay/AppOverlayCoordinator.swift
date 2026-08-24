@@ -122,10 +122,10 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
         clearSnackbars(removalHost: disconnectedHost)
     }
 }
+
 private extension AppOverlayCoordinator {
     enum DialogPhase {
-        case entering
-        case visible
+        case entering, visible
         case exiting(ClipyDialog.Response)
     }
 
@@ -135,6 +135,7 @@ private extension AppOverlayCoordinator {
         var ownsHostedView: Bool
         var phase: DialogPhase
     }
+
     struct SnackbarFingerprint: Hashable {
         let message: [UInt8]
         let actionTitle: [UInt8]?
@@ -144,23 +145,26 @@ private extension AppOverlayCoordinator {
             self.actionTitle = actionTitle.map { Array($0.utf8) }
         }
     }
+
     struct QueuedSnackbar {
         let request: ClipySnackbar.Request
         let fingerprint: SnackbarFingerprint
     }
+
     enum SnackbarCompletion {
         case dismissed
         case action(@MainActor () -> Void)
     }
+
     enum SnackbarDismissal {
-        case dismiss
-        case action
+        case dismiss, action
     }
+
     enum SnackbarPhase {
-        case entering
-        case visible
+        case entering, visible
         case exiting(SnackbarCompletion)
     }
+
     struct SnackbarState {
         let token: UUID
         let fingerprint: SnackbarFingerprint
@@ -170,9 +174,7 @@ private extension AppOverlayCoordinator {
     }
 
     func completeDialogEntry(token: UUID, result: AppOverlayMountResult) {
-        guard let current = dialog, current.token == token, case .entering = current.phase else {
-            return
-        }
+        guard let current = dialog, current.token == token, case .entering = current.phase else { return }
         switch result {
         case .displayed:
             dialog?.phase = .visible
@@ -182,9 +184,7 @@ private extension AppOverlayCoordinator {
     }
 
     func failDialogEntry(token: UUID, ownsHostedView: Bool) {
-        guard let current = dialog, current.token == token, case .entering = current.phase else {
-            return
-        }
+        guard let current = dialog, current.token == token, case .entering = current.phase else { return }
         dialog?.ownsHostedView = ownsHostedView
         dialog?.phase = .exiting(.cancelled(.displayFailed))
         let removalHost = ownsHostedView ? host : nil

@@ -21,7 +21,7 @@ enum AppOverlayMountAdmission: Equatable {
 }
 
 /// Dialog와 Snackbar view를 root overlay에 붙이고 떼는 host입니다.
-/// Coordinator는 completion을 기준으로 다음 상태를 고릅니다.
+/// Coordinator는 즉시 반환되는 slot 승인과 completion의 표시 결과를 나눠 상태를 고릅니다.
 @MainActor
 protocol AppOverlayHosting: AnyObject {
     /// 새 overlay를 받을 수 있도록 host view가 window에 붙어 있는지 알려줍니다.
