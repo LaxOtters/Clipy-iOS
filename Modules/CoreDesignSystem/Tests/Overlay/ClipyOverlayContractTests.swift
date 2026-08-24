@@ -92,6 +92,42 @@ final class ClipyOverlayContractTests: XCTestCase {
         XCTAssertEqual(dismissCount, 0)
     }
 
+    func test_verticalSnackbarMessageBottom_routesToBodyWithoutInvokingAction() throws {
+        var actionCount = 0
+        let message = "First line\nSecond line"
+        let snackbar = ClipySnackbarView(
+            message: message,
+            action: .init(title: "Try again") { actionCount += 1 },
+            onDismiss: {}
+        )
+        let fittingSize = snackbar.systemLayoutSizeFitting(
+            CGSize(width: 349, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        snackbar.frame = CGRect(origin: .zero, size: fittingSize)
+        snackbar.layoutIfNeeded()
+
+        let actionButton = try snackbar.button(titled: "Try again")
+        let messageLabel = try XCTUnwrap(
+            snackbar.descendants(of: UILabel.self).first {
+                $0.attributedText?.string == message
+            }
+        )
+        let actionFrame = actionButton.convert(actionButton.bounds, to: snackbar)
+        let messageFrame = messageLabel.convert(messageLabel.bounds, to: snackbar)
+        let pointAtMessageBottom = CGPoint(
+            x: actionFrame.midX,
+            y: messageFrame.maxY - 1
+        )
+
+        XCTAssertTrue(messageFrame.contains(pointAtMessageBottom))
+        let bodyTarget = try XCTUnwrap(snackbar.hitTest(pointAtMessageBottom, with: nil))
+
+        XCTAssertTrue(bodyTarget === snackbar)
+        XCTAssertEqual(actionCount, 0)
+    }
+
 }
 
 private extension UIView {

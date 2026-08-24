@@ -53,6 +53,10 @@ public final class ClipySnackbarView: UIControl {
         contentStack.axis = usesVerticalLayout ? .vertical : .horizontal
         contentStack.alignment = usesVerticalLayout ? .trailing : .center
         contentStack.spacing = usesVerticalLayout ? 8 : 12
+        contentStack.layoutIfNeeded()
+        actionButton.updateHitArea(
+            maximumTopExpansion: usesVerticalLayout ? contentStack.spacing : nil
+        )
     }
 
     public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
@@ -187,6 +191,22 @@ private extension ClipySnackbarView {
 
 private final class SnackbarActionButton: UIButton {
     private let minimumHitSize = CGSize(width: 44, height: 44)
+    private var hitAreaInsets = UIEdgeInsets.zero
+
+    func updateHitArea(maximumTopExpansion: CGFloat?) {
+        let horizontalExpansion = max((minimumHitSize.width - bounds.width) / 2, 0)
+        let requiredVerticalExpansion = max(minimumHitSize.height - bounds.height, 0)
+        let centeredTopExpansion = requiredVerticalExpansion / 2
+        let topExpansion = min(maximumTopExpansion ?? centeredTopExpansion, centeredTopExpansion)
+        let bottomExpansion = requiredVerticalExpansion - topExpansion
+
+        hitAreaInsets = UIEdgeInsets(
+            top: -topExpansion,
+            left: -horizontalExpansion,
+            bottom: -bottomExpansion,
+            right: -horizontalExpansion
+        )
+    }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         guard isUserInteractionEnabled,
@@ -195,9 +215,7 @@ private final class SnackbarActionButton: UIButton {
             return false
         }
 
-        // 짧은 action도 주변 여백까지 같은 control로 처리하되, 영역 밖 drag-out은 UIKit에 맡깁니다.
-        let horizontalInset = min((bounds.width - minimumHitSize.width) / 2, 0)
-        let verticalInset = min((bounds.height - minimumHitSize.height) / 2, 0)
-        return bounds.insetBy(dx: horizontalInset, dy: verticalInset).contains(point)
+        // 세로 배치에서는 메시지 쪽 확장을 간격 안으로 제한하고, 남은 영역은 아래 여백을 사용합니다.
+        return bounds.inset(by: hitAreaInsets).contains(point)
     }
 }
