@@ -18,14 +18,25 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         let secondScheduler = OverlaySchedulerSpy()
         let firstCoordinator = makeOverlayCoordinator(host: host, scheduler: firstScheduler)
         let secondCoordinator = makeOverlayCoordinator(host: host, scheduler: secondScheduler)
+        weak var rejectedSentinel: LifetimeSentinel?
 
         XCTAssertEqual(firstCoordinator.enqueueSnackbar(.init(message: "First")), .accepted)
-        XCTAssertEqual(secondCoordinator.enqueueSnackbar(.init(message: "Second")), .accepted)
+        do {
+            let sentinel = LifetimeSentinel()
+            rejectedSentinel = sentinel
+            XCTAssertEqual(
+                secondCoordinator.enqueueSnackbar(
+                    .init(message: "Second", action: .init(title: "Open") { [sentinel] in _ = sentinel })
+                ),
+                .unavailable(.hostUnavailable)
+            )
+        }
 
         XCTAssertEqual(host.snackbarMessages, ["First"])
         XCTAssertEqual(host.mountedSnackbarCount, 1)
         XCTAssertEqual(firstScheduler.tasks.count, 1)
         XCTAssertTrue(secondScheduler.tasks.isEmpty)
+        XCTAssertNil(rejectedSentinel)
 
         secondCoordinator.shutdown()
 
@@ -37,6 +48,26 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         XCTAssertEqual(host.snackbarUnmountAnimations, [true])
         XCTAssertEqual(host.mountedSnackbarCount, 0)
         XCTAssertNil(host.outsideTapHandler)
+    }
+
+    func test_unavailableAdmission_rejectsSnackbar_withoutRetainingAction() {
+        let host = OverlayHostSpy(snackbarMountAdmission: .unavailable)
+        let coordinator = makeOverlayCoordinator(host: host)
+        weak var weakSentinel: LifetimeSentinel?
+
+        do {
+            let sentinel = LifetimeSentinel()
+            weakSentinel = sentinel
+            XCTAssertEqual(
+                coordinator.enqueueSnackbar(
+                    .init(message: "Saved", action: .init(title: "Undo") { [sentinel] in _ = sentinel })
+                ),
+                .unavailable(.hostUnavailable)
+            )
+        }
+
+        XCTAssertNil(weakSentinel)
+        XCTAssertEqual(host.mountedSnackbarCount, 0)
     }
 
     func test_snackbarQueue_deduplicatesExactTupleAndAdvancesFIFO() {

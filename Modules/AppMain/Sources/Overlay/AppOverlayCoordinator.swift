@@ -45,9 +45,7 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
         // Dialog가 내려가는 중에도 아직 자리를 비운 게 아니므로, scene/host보다 중복 요청을 먼저 봅니다.
         guard dialog == nil else { return .rejected(.dialogAlreadyPresented) }
         guard isSceneActive else { return .rejected(.sceneInactive) }
-        guard !isShutdown, let host, host.isOverlayHostAvailable else {
-            return .rejected(.hostUnavailable)
-        }
+        guard !isShutdown, let host, host.isOverlayHostAvailable else { return .rejected(.hostUnavailable) }
         let token = UUID()
         dialog = DialogState(token: token, response: response, ownsHostedView: false, phase: .entering)
         let admission = host.mountDialog(
@@ -63,21 +61,19 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
                 self?.completeDialogEntry(token: token, result: result)
             }
         )
-        switch admission {
-        case .accepted:
-            dialog?.ownsHostedView = true
-        case .unavailable, .occupied:
-            failDialogEntry(token: token, ownsHostedView: false)
+        guard admission == .accepted else {
+            dialog = nil
+            let rejection: ClipyDialog.RequestRejection = admission == .occupied ? .dialogAlreadyPresented : .hostUnavailable
+            return .rejected(rejection)
         }
+        dialog?.ownsHostedView = true
         return .accepted
     }
 
     @discardableResult
     func enqueueSnackbar(_ request: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
         guard isSceneActive else { return .unavailable(.sceneInactive) }
-        guard !isShutdown, let host, host.isOverlayHostAvailable else {
-            return .unavailable(.hostUnavailable)
-        }
+        guard !isShutdown, let host, host.isOverlayHostAvailable else { return .unavailable(.hostUnavailable) }
         let fingerprint = SnackbarFingerprint(
             message: request.message,
             actionTitle: request.action?.title
@@ -86,7 +82,9 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
             return .duplicateDropped
         }
         snackbarQueue.append(QueuedSnackbar(request: request, fingerprint: fingerprint))
-        showNextSnackbarIfNeeded()
+        if let admission = showNextSnackbarIfNeeded(), admission != .accepted {
+            return .unavailable(.hostUnavailable)
+        }
         return .accepted
     }
 
@@ -179,16 +177,16 @@ private extension AppOverlayCoordinator {
         case .displayed:
             dialog?.phase = .visible
         case .unavailable:
-            failDialogEntry(token: token, ownsHostedView: true)
+            failDialogEntry(token: token)
         }
     }
 
-    func failDialogEntry(token: UUID, ownsHostedView: Bool) {
+    func failDialogEntry(token: UUID) {
         guard let current = dialog, current.token == token, case .entering = current.phase else { return }
-        dialog?.ownsHostedView = ownsHostedView
+        dialog?.ownsHostedView = true
         dialog?.phase = .exiting(.cancelled(.displayFailed))
-        let removalHost = ownsHostedView ? host : nil
-        // 동기 실패에서도 .accepted를 먼저 반환하고, 승인받지 못한 host slot은 건드리지 않습니다.
+        let removalHost = host
+        // 동기 표시 실패에서도 .accepted를 먼저 반환한 뒤 response를 전달합니다.
         DispatchQueue.main.async { [self] in
             guard let current = dialog, current.token == token, case .exiting = current.phase else {
                 return
@@ -261,7 +259,8 @@ private extension AppOverlayCoordinator {
         current.response(response)
     }
 
-    func showNextSnackbarIfNeeded() {
+    @discardableResult
+    func showNextSnackbarIfNeeded() -> AppOverlayMountAdmission? {
         guard
             !isInvokingSnackbarAction,
             isSceneActive,
@@ -271,7 +270,7 @@ private extension AppOverlayCoordinator {
             let host,
             host.isOverlayHostAvailable
         else {
-            return
+            return nil
         }
         let pending = snackbarQueue.removeFirst()
         let token = UUID()
@@ -297,9 +296,10 @@ private extension AppOverlayCoordinator {
         )
         switch admission {
         case .accepted:
-            break
+            return .accepted
         case .unavailable, .occupied:
             clearSnackbars(removalHost: nil)
+            return admission
         }
     }
 

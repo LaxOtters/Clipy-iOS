@@ -51,6 +51,8 @@ final class OverlayHostSpy: AppOverlayHosting {
     var hostDetachHandler: (() -> Void)?
 
     private let dialogMountResult: AppOverlayMountResult?
+    private let dialogMountAdmission: AppOverlayMountAdmission
+    private let snackbarMountAdmission: AppOverlayMountAdmission
     private let defersDialogUnmount: Bool
     private let defersSnackbarMount: Bool
     private let defersSnackbarUnmount: Bool
@@ -62,12 +64,16 @@ final class OverlayHostSpy: AppOverlayHosting {
     init(
         isAvailable: Bool = true,
         dialogMountResult: AppOverlayMountResult? = .displayed,
+        dialogMountAdmission: AppOverlayMountAdmission = .accepted,
+        snackbarMountAdmission: AppOverlayMountAdmission = .accepted,
         defersDialogUnmount: Bool = false,
         defersSnackbarMount: Bool = false,
         defersSnackbarUnmount: Bool = false
     ) {
         isOverlayHostAvailable = isAvailable
         self.dialogMountResult = dialogMountResult
+        self.dialogMountAdmission = dialogMountAdmission
+        self.snackbarMountAdmission = snackbarMountAdmission
         self.defersDialogUnmount = defersDialogUnmount
         self.defersSnackbarMount = defersSnackbarMount
         self.defersSnackbarUnmount = defersSnackbarUnmount
@@ -78,6 +84,9 @@ final class OverlayHostSpy: AppOverlayHosting {
         onSelection: @escaping (ClipyDialog.Selection, String?) -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
     ) -> AppOverlayMountAdmission {
+        guard dialogMountAdmission == .accepted else {
+            return dialogMountAdmission
+        }
         guard mountedDialogCount == 0 else {
             return .occupied
         }
@@ -111,6 +120,9 @@ final class OverlayHostSpy: AppOverlayHosting {
         onDismiss: @escaping () -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
     ) -> AppOverlayMountAdmission {
+        guard snackbarMountAdmission == .accepted else {
+            return snackbarMountAdmission
+        }
         guard mountedSnackbarCount == 0 else {
             return .occupied
         }
