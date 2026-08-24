@@ -196,6 +196,10 @@ extension AppOverlayContainerViewController: AppOverlayHosting {
         preferredWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
             topConstraint,
+            snackbarView.bottomAnchor.constraint(
+                lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -10
+            ),
             snackbarView.centerXAnchor.constraint(equalTo: snackbarLayer.centerXAnchor),
             snackbarView.leadingAnchor.constraint(greaterThanOrEqualTo: snackbarLayer.leadingAnchor, constant: 20),
             snackbarView.trailingAnchor.constraint(lessThanOrEqualTo: snackbarLayer.trailingAnchor, constant: -20),

@@ -142,9 +142,46 @@ final class AppOverlayContainerViewControllerTests: XCTestCase {
         XCTAssertNil(container.view.firstDescendant(of: ClipySnackbarView.self))
     }
 
-    private func makeVisibleContainer() -> (AppOverlayContainerViewController, UIWindow) {
+    func test_mountingLongSnackbar_keepsActionWithinVisibleArea() async throws {
+        let (container, window) = makeVisibleContainer(
+            frame: CGRect(x: 0, y: 0, width: 320, height: 200)
+        )
+        defer {
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+        let mounted = expectation(description: "Snackbar entry completed")
+
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(true) }
+        XCTAssertEqual(
+            container.mountSnackbar(
+                message: String(repeating: "Long snackbar message ", count: 20),
+                actionTitle: "Retry",
+                onAction: {},
+                onDismiss: {},
+                completion: { _ in mounted.fulfill() }
+            ),
+            .accepted
+        )
+        await fulfillment(of: [mounted], timeout: 1)
+        container.view.layoutIfNeeded()
+
+        let snackbar = try XCTUnwrap(container.view.firstDescendant(of: ClipySnackbarView.self))
+        let actionButton = try XCTUnwrap(snackbar.firstDescendant(of: UIButton.self))
+        let actionFrame = actionButton.convert(actionButton.bounds, to: container.view)
+
+        XCTAssertLessThanOrEqual(
+            actionFrame.maxY,
+            container.view.safeAreaLayoutGuide.layoutFrame.maxY - 10
+        )
+    }
+
+    private func makeVisibleContainer(
+        frame: CGRect = CGRect(x: 0, y: 0, width: 390, height: 844)
+    ) -> (AppOverlayContainerViewController, UIWindow) {
         let container = AppOverlayContainerViewController(contentViewController: UIViewController())
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let window = UIWindow(frame: frame)
         window.rootViewController = container
         window.makeKeyAndVisible()
         container.loadViewIfNeeded()

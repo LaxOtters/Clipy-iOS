@@ -11,6 +11,8 @@ import UIKit
 /// 본문 탭은 닫기만 요청하고, action 버튼은 해당 action만 실행합니다.
 @MainActor
 public final class ClipySnackbarView: UIControl {
+    private static let maximumMessageLineCount = 2
+
     private enum LayoutMode {
         case contentOnly
         case horizontalAction
@@ -109,7 +111,8 @@ private extension ClipySnackbarView {
     }
 
     func configureContent(message: String, action: ClipySnackbar.Action?) {
-        messageLabel.numberOfLines = 0
+        messageLabel.numberOfLines = Self.maximumMessageLineCount
+        messageLabel.lineBreakMode = .byTruncatingTail
         messageLabel.isUserInteractionEnabled = false
         messageLabel.translatesAutoresizingMaskIntoConstraints = false
         ClipyTypography.body1Medium.apply(
@@ -167,7 +170,7 @@ private extension ClipySnackbarView {
     private func constraints(for mode: LayoutMode) -> [NSLayoutConstraint] {
         switch mode {
         case .contentOnly:
-            messageLabel.numberOfLines = 0
+            messageLabel.numberOfLines = Self.maximumMessageLineCount
             return [
                 messageLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
                 messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
@@ -197,7 +200,7 @@ private extension ClipySnackbarView {
             ]
 
         case .verticalAction:
-            messageLabel.numberOfLines = 0
+            messageLabel.numberOfLines = Self.maximumMessageLineCount
             actionButton.configuration?.contentInsets = NSDirectionalEdgeInsets(
                 top: 8,
                 leading: 12,
