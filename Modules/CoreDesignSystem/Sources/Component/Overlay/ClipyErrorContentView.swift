@@ -46,13 +46,6 @@ private extension ClipyErrorContentView {
         body: String,
         action: Action?
     ) {
-        let imageView = UIImageView(image: CoreDesignSystemImage.errorRounded)
-        imageView.contentMode = .scaleAspectFit
-        NSLayoutConstraint.activate([
-            imageView.widthAnchor.constraint(equalToConstant: 70),
-            imageView.heightAnchor.constraint(equalToConstant: 70)
-        ])
-
         let titleLabel = UILabel()
         titleLabel.numberOfLines = 0
         titleLabel.textAlignment = .center
@@ -77,7 +70,7 @@ private extension ClipyErrorContentView {
         textStack.spacing = 10
 
         let detailsScrollView = makeDetailsScrollView(
-            imageView: imageView,
+            image: CoreDesignSystemImage.errorRounded,
             textStack: textStack
         )
 
@@ -104,10 +97,22 @@ private extension ClipyErrorContentView {
     }
 
     func makeDetailsScrollView(
-        imageView: UIImageView,
+        image: UIImage?,
         textStack: UIStackView
     ) -> UIScrollView {
-        let detailsStack = UIStackView(arrangedSubviews: [imageView, textStack])
+        var arrangedSubviews: [UIView] = []
+        if let image {
+            let imageView = UIImageView(image: image)
+            imageView.contentMode = .scaleAspectFit
+            NSLayoutConstraint.activate([
+                imageView.widthAnchor.constraint(equalToConstant: 70),
+                imageView.heightAnchor.constraint(equalToConstant: 70)
+            ])
+            arrangedSubviews.append(imageView)
+        }
+        arrangedSubviews.append(textStack)
+
+        let detailsStack = UIStackView(arrangedSubviews: arrangedSubviews)
         detailsStack.axis = .vertical
         detailsStack.alignment = .center
         detailsStack.spacing = 30

@@ -117,7 +117,10 @@ private extension ClipyDialogView {
         case .plain:
             return nil
         case .semanticIcon(.error):
-            let imageView = UIImageView(image: CoreDesignSystemImage.errorRounded)
+            guard let image = CoreDesignSystemImage.errorRounded else {
+                return nil
+            }
+            let imageView = UIImageView(image: image)
             imageView.contentMode = .scaleAspectFit
             NSLayoutConstraint.activate([
                 imageView.widthAnchor.constraint(equalToConstant: 60),
@@ -127,21 +130,6 @@ private extension ClipyDialogView {
             container.alignment = .center
             return container
         case let .websiteRequest(sourceText):
-            let imageView = UIImageView(image: CoreDesignSystemImage.dialogRequestSource)
-            imageView.contentMode = .center
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-
-            let imageContainer = UIView()
-            imageContainer.addSubview(imageView)
-            NSLayoutConstraint.activate([
-                imageContainer.widthAnchor.constraint(equalToConstant: 24),
-                imageContainer.heightAnchor.constraint(equalToConstant: 24),
-                imageView.centerXAnchor.constraint(equalTo: imageContainer.centerXAnchor),
-                imageView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor),
-                imageView.widthAnchor.constraint(equalToConstant: 24),
-                imageView.heightAnchor.constraint(equalToConstant: 24)
-            ])
-
             let sourceLabel = UILabel()
             sourceLabel.numberOfLines = 1
             sourceLabel.lineBreakMode = .byTruncatingTail
@@ -151,7 +139,27 @@ private extension ClipyDialogView {
                 color: ClipyColor.Foundation.neutral700
             )
 
-            let stack = UIStackView(arrangedSubviews: [imageContainer, sourceLabel])
+            var arrangedSubviews: [UIView] = []
+            if let image = CoreDesignSystemImage.dialogRequestSource {
+                let imageView = UIImageView(image: image)
+                imageView.contentMode = .center
+                imageView.translatesAutoresizingMaskIntoConstraints = false
+
+                let imageContainer = UIView()
+                imageContainer.addSubview(imageView)
+                NSLayoutConstraint.activate([
+                    imageContainer.widthAnchor.constraint(equalToConstant: 24),
+                    imageContainer.heightAnchor.constraint(equalToConstant: 24),
+                    imageView.centerXAnchor.constraint(equalTo: imageContainer.centerXAnchor),
+                    imageView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor),
+                    imageView.widthAnchor.constraint(equalToConstant: 24),
+                    imageView.heightAnchor.constraint(equalToConstant: 24)
+                ])
+                arrangedSubviews.append(imageContainer)
+            }
+            arrangedSubviews.append(sourceLabel)
+
+            let stack = UIStackView(arrangedSubviews: arrangedSubviews)
             stack.axis = .horizontal
             stack.alignment = .center
             stack.spacing = 6
