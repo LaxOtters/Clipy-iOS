@@ -11,13 +11,17 @@ import UIKit
 /// 본문 탭은 닫기만 요청하고, action 버튼은 해당 action만 실행합니다.
 @MainActor
 public final class ClipySnackbarView: UIControl {
+    private enum LayoutMode {
+        case contentOnly
+        case horizontalAction
+        case verticalAction
+    }
+
     private let messageLabel = UILabel()
-    private let actionButton = SnackbarActionButton(type: .system)
-    private let contentStack = UIStackView()
+    private let actionButton = UIButton(type: .system)
     private let onDismiss: () -> Void
-    private lazy var messageVerticalWidthConstraint = messageLabel.widthAnchor.constraint(
-        equalTo: contentStack.widthAnchor
-    )
+    private var layoutMode: LayoutMode?
+    private var activeLayoutConstraints: [NSLayoutConstraint] = []
 
     public init(
         message: String,
@@ -29,52 +33,30 @@ public final class ClipySnackbarView: UIControl {
 
         configureBackground()
         configureContent(message: message, action: action)
+        updateLayoutMode(for: 349)
         addTarget(self, action: #selector(didTapBody), for: .touchUpInside)
     }
 
-    public override func layoutSubviews() {
-        super.layoutSubviews()
+    public override func systemLayoutSizeFitting(
+        _ targetSize: CGSize,
+        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+        verticalFittingPriority: UILayoutPriority
+    ) -> CGSize {
+        let fittingWidth = targetSize.width.isFinite && targetSize.width > 0
+            ? targetSize.width
+            : max(bounds.width, 349)
+        updateLayoutMode(for: fittingWidth)
 
-        guard !actionButton.isHidden else {
-            messageVerticalWidthConstraint.isActive = false
-            contentStack.axis = .horizontal
-            contentStack.alignment = .center
-            return
-        }
-
-        let availableWidth = max(bounds.width - 32, 0)
-        let requiredWidth = messageSingleLineWidth
-            + actionButton.intrinsicContentSize.width
-            + 12
-        let usesVerticalLayout = messageContainsExplicitLineBreak
-            || requiredWidth > availableWidth
-        messageVerticalWidthConstraint.isActive = usesVerticalLayout
-        messageLabel.numberOfLines = usesVerticalLayout ? 0 : 1
-        contentStack.axis = usesVerticalLayout ? .vertical : .horizontal
-        contentStack.alignment = usesVerticalLayout ? .trailing : .center
-        contentStack.spacing = usesVerticalLayout ? 8 : 12
-        contentStack.layoutIfNeeded()
-        actionButton.updateHitArea(
-            maximumTopExpansion: usesVerticalLayout ? contentStack.spacing : nil
+        return super.systemLayoutSizeFitting(
+            targetSize,
+            withHorizontalFittingPriority: horizontalFittingPriority,
+            verticalFittingPriority: verticalFittingPriority
         )
     }
 
-    public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard isUserInteractionEnabled,
-              !isHidden,
-              alpha > 0.01,
-              self.point(inside: point, with: event) else {
-            return nil
-        }
-
-        let actionPoint = actionButton.convert(point, from: self)
-        // 버튼 영역을 먼저 넘겨서 body dismiss와 action이 같이 실행되지 않게 합니다.
-        if !actionButton.isHidden,
-           let actionTarget = actionButton.hitTest(actionPoint, with: event) {
-            return actionTarget
-        }
-
-        return self
+    public override func layoutSubviews() {
+        updateLayoutMode(for: bounds.width)
+        super.layoutSubviews()
     }
 
     @available(*, unavailable)
@@ -130,21 +112,22 @@ private extension ClipySnackbarView {
     func configureContent(message: String, action: ClipySnackbar.Action?) {
         messageLabel.numberOfLines = 0
         messageLabel.isUserInteractionEnabled = false
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
         ClipyTypography.body1Medium.apply(
             to: messageLabel,
             text: message,
             color: ClipyColor.Foundation.primary50
         )
+        addSubview(messageLabel)
 
         actionButton.contentHorizontalAlignment = .trailing
         actionButton.configuration = .plain()
-        actionButton.configuration?.contentInsets = .zero
         actionButton.configuration?.titleLineBreakMode = .byTruncatingTail
         actionButton.titleLabel?.numberOfLines = 1
         actionButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        actionButton.translatesAutoresizingMaskIntoConstraints = false
 
         if let action {
-            actionButton.isHidden = false
             actionButton.setAttributedTitle(
                 ClipyTypography.body1SemiBold.attributedString(
                     action.title,
@@ -158,25 +141,13 @@ private extension ClipySnackbarView {
                 UIAction { _ in action.handler() },
                 for: .touchUpInside
             )
+            addSubview(actionButton)
         } else {
             actionButton.isHidden = true
         }
 
-        contentStack.addArrangedSubview(messageLabel)
-        contentStack.addArrangedSubview(actionButton)
-        contentStack.axis = .horizontal
-        contentStack.alignment = .center
-        contentStack.spacing = 12
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(contentStack)
-
         NSLayoutConstraint.activate([
-            contentStack.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 349),
-            actionButton.widthAnchor.constraint(lessThanOrEqualTo: contentStack.widthAnchor)
+            widthAnchor.constraint(lessThanOrEqualToConstant: 349)
         ])
 
         messageLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -184,38 +155,83 @@ private extension ClipySnackbarView {
         actionButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     }
 
+    func updateLayoutMode(for width: CGFloat) {
+        let nextMode = resolvedLayoutMode(for: width)
+        guard nextMode != layoutMode else { return }
+
+        NSLayoutConstraint.deactivate(activeLayoutConstraints)
+        layoutMode = nextMode
+        activeLayoutConstraints = constraints(for: nextMode)
+        NSLayoutConstraint.activate(activeLayoutConstraints)
+    }
+
+    private func constraints(for mode: LayoutMode) -> [NSLayoutConstraint] {
+        switch mode {
+        case .contentOnly:
+            messageLabel.numberOfLines = 0
+            return [
+                messageLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+                messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+                messageLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+                messageLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+            ]
+
+        case .horizontalAction:
+            messageLabel.numberOfLines = 1
+            actionButton.configuration?.contentInsets = NSDirectionalEdgeInsets(
+                top: 12,
+                leading: 12,
+                bottom: 12,
+                trailing: 16
+            )
+            return [
+                messageLabel.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 12),
+                messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+                messageLabel.trailingAnchor.constraint(equalTo: actionButton.leadingAnchor),
+                messageLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -12),
+                messageLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+                actionButton.topAnchor.constraint(equalTo: topAnchor),
+                actionButton.trailingAnchor.constraint(equalTo: trailingAnchor),
+                actionButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+                actionButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+                actionButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+            ]
+
+        case .verticalAction:
+            messageLabel.numberOfLines = 0
+            actionButton.configuration?.contentInsets = NSDirectionalEdgeInsets(
+                top: 8,
+                leading: 12,
+                bottom: 12,
+                trailing: 16
+            )
+            return [
+                messageLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+                messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+                messageLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+                actionButton.topAnchor.constraint(equalTo: messageLabel.bottomAnchor),
+                actionButton.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+                actionButton.trailingAnchor.constraint(equalTo: trailingAnchor),
+                actionButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+                actionButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+                actionButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+            ]
+        }
+    }
+
+    private func resolvedLayoutMode(for width: CGFloat) -> LayoutMode {
+        guard !actionButton.isHidden else { return .contentOnly }
+        guard width > 0 else { return layoutMode ?? .horizontalAction }
+
+        let requiredWidth = 16
+            + messageSingleLineWidth
+            + actionButton.intrinsicContentSize.width
+        return messageContainsExplicitLineBreak || requiredWidth > width
+            ? .verticalAction
+            : .horizontalAction
+    }
+
     @objc func didTapBody() {
         onDismiss()
-    }
-}
-
-private final class SnackbarActionButton: UIButton {
-    private let minimumHitSize = CGSize(width: 44, height: 44)
-    private var hitAreaInsets = UIEdgeInsets.zero
-
-    func updateHitArea(maximumTopExpansion: CGFloat?) {
-        let horizontalExpansion = max((minimumHitSize.width - bounds.width) / 2, 0)
-        let requiredVerticalExpansion = max(minimumHitSize.height - bounds.height, 0)
-        let centeredTopExpansion = requiredVerticalExpansion / 2
-        let topExpansion = min(maximumTopExpansion ?? centeredTopExpansion, centeredTopExpansion)
-        let bottomExpansion = requiredVerticalExpansion - topExpansion
-
-        hitAreaInsets = UIEdgeInsets(
-            top: -topExpansion,
-            left: -horizontalExpansion,
-            bottom: -bottomExpansion,
-            right: -horizontalExpansion
-        )
-    }
-
-    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        guard isUserInteractionEnabled,
-              !isHidden,
-              alpha > 0.01 else {
-            return false
-        }
-
-        // 세로 배치에서는 메시지 쪽 확장을 간격 안으로 제한하고, 남은 영역은 아래 여백을 사용합니다.
-        return bounds.inset(by: hitAreaInsets).contains(point)
     }
 }

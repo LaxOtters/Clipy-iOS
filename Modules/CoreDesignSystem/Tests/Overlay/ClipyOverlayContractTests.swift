@@ -12,7 +12,7 @@ import XCTest
 
 @MainActor
 final class ClipyOverlayContractTests: XCTestCase {
-    func test_websiteRequestButton_usesPrimary500_withoutChangingPublicPrimaryVariant() {
+    func test_primary500ColorRole_doesNotChangePublicPrimaryVariant() {
         let publicButton = ClipyButton(variant: .primaryMedium, title: "Continue")
         let websiteButton = ClipyButton(
             variant: .primaryMedium,
@@ -32,22 +32,26 @@ final class ClipyOverlayContractTests: XCTestCase {
 
     func test_promptDialogButtons_returnCurrentTextSnapshotAndSelectedPosition() throws {
         var selections: [(ClipyDialog.Selection, String?)] = []
-        let dialog = ClipyDialogView(
-            configuration: .prompt(
-                presentation: .plain,
-                title: "Enter a value",
-                body: "This site is requesting input.",
-                initialText: "Initial",
-                placeholder: "Value",
-                primaryTitle: "Confirm",
-                secondaryTitle: "Cancel"
-            )
-        ) { selections.append(($0, $1)) }
+        let configuration = ClipyDialog.Configuration.prompt(
+            presentation: .plain,
+            title: "Enter a value",
+            body: "This site is requesting input.",
+            initialText: "Initial",
+            placeholder: "Value",
+            primaryTitle: "Confirm",
+            secondaryTitle: "Cancel"
+        )
+        let secondaryDialog = ClipyDialogView(configuration: configuration) {
+            selections.append(($0, $1))
+        }
+        let primaryDialog = ClipyDialogView(configuration: configuration) {
+            selections.append(($0, $1))
+        }
 
-        let textField = try XCTUnwrap(dialog.firstDescendant(of: UITextField.self))
-        textField.text = "Edited"
-        try dialog.button(titled: "Cancel").sendActions(for: .touchUpInside)
-        try dialog.button(titled: "Confirm").sendActions(for: .touchUpInside)
+        try XCTUnwrap(secondaryDialog.firstDescendant(of: UITextField.self)).text = "Edited"
+        try secondaryDialog.button(titled: "Cancel").sendActions(for: .touchUpInside)
+        try XCTUnwrap(primaryDialog.firstDescendant(of: UITextField.self)).text = "Edited"
+        try primaryDialog.button(titled: "Confirm").sendActions(for: .touchUpInside)
 
         XCTAssertEqual(selections.map(\.0), [.secondary, .primary])
         XCTAssertEqual(selections.map(\.1), ["Edited", "Edited"])
@@ -66,38 +70,42 @@ final class ClipyOverlayContractTests: XCTestCase {
         XCTAssertEqual(actionCount, 1)
     }
 
-    func test_snackbarActionTouchArea_routesOnlyAction_outsideVisibleButtonBounds() throws {
-        var actionCount = 0
-        var dismissCount = 0
+    func test_shortSnackbarAction_reservesNonOverlappingMinimumTouchWidth() throws {
         let snackbar = ClipySnackbarView(
             message: "Couldn’t load this page.",
-            action: .init(title: "Try again") { actionCount += 1 },
-            onDismiss: { dismissCount += 1 }
+            action: .init(title: "X") {},
+            onDismiss: {}
         )
         snackbar.frame = CGRect(x: 0, y: 0, width: 349, height: 48)
         snackbar.layoutIfNeeded()
 
-        let actionButton = try snackbar.button(titled: "Try again")
+        let actionButton = try snackbar.button(titled: "X")
         let actionFrame = actionButton.convert(actionButton.bounds, to: snackbar)
-        let pointBelowButton = CGPoint(
-            x: actionFrame.midX,
-            y: min(snackbar.bounds.maxY - 1, actionFrame.maxY + 8)
+        let messageLabel = try XCTUnwrap(
+            snackbar.descendants(of: UILabel.self).first {
+                $0.attributedText?.string == "Couldn’t load this page."
+            }
+        )
+        let messageFrame = messageLabel.convert(messageLabel.bounds, to: snackbar)
+        let pointAtMessageTrailingEdge = CGPoint(
+            x: messageFrame.maxX - 1,
+            y: messageFrame.midY
         )
 
-        XCTAssertFalse(actionFrame.contains(pointBelowButton))
-        let actionTarget = try XCTUnwrap(snackbar.hitTest(pointBelowButton, with: nil) as? UIControl)
-        actionTarget.sendActions(for: .touchUpInside)
-
-        XCTAssertEqual(actionCount, 1)
-        XCTAssertEqual(dismissCount, 0)
+        XCTAssertGreaterThanOrEqual(actionFrame.width, 44)
+        XCTAssertLessThanOrEqual(messageFrame.maxX, actionFrame.minX)
+        let bodyTarget = try XCTUnwrap(snackbar.hitTest(pointAtMessageTrailingEdge, with: nil))
+        XCTAssertTrue(bodyTarget === snackbar)
+        let actionCenter = CGPoint(x: actionFrame.midX, y: actionFrame.midY)
+        let actionTarget = try XCTUnwrap(snackbar.hitTest(actionCenter, with: nil))
+        XCTAssertTrue(actionTarget === actionButton)
     }
 
-    func test_verticalSnackbarMessageBottom_routesToBodyWithoutInvokingAction() throws {
-        var actionCount = 0
+    func test_verticalSnackbar_fittingSizeContainsMessageAndAction() throws {
         let message = "First line\nSecond line"
         let snackbar = ClipySnackbarView(
             message: message,
-            action: .init(title: "Try again") { actionCount += 1 },
+            action: .init(title: "Try again") {},
             onDismiss: {}
         )
         let fittingSize = snackbar.systemLayoutSizeFitting(
@@ -116,16 +124,9 @@ final class ClipyOverlayContractTests: XCTestCase {
         )
         let actionFrame = actionButton.convert(actionButton.bounds, to: snackbar)
         let messageFrame = messageLabel.convert(messageLabel.bounds, to: snackbar)
-        let pointAtMessageBottom = CGPoint(
-            x: actionFrame.midX,
-            y: messageFrame.maxY - 1
-        )
 
-        XCTAssertTrue(messageFrame.contains(pointAtMessageBottom))
-        let bodyTarget = try XCTUnwrap(snackbar.hitTest(pointAtMessageBottom, with: nil))
-
-        XCTAssertTrue(bodyTarget === snackbar)
-        XCTAssertEqual(actionCount, 0)
+        XCTAssertLessThanOrEqual(messageFrame.maxY, actionFrame.minY)
+        XCTAssertLessThanOrEqual(actionFrame.maxY, snackbar.bounds.maxY)
     }
 
 }
