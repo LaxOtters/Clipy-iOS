@@ -70,7 +70,25 @@ private extension ClipyDialogView {
             promptTextField = textField
         }
 
-        contentStack.addArrangedSubview(detailsStack)
+        detailsStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let detailsScrollView = UIScrollView()
+        detailsScrollView.alwaysBounceVertical = false
+        detailsScrollView.showsVerticalScrollIndicator = true
+        detailsScrollView.addSubview(detailsStack)
+
+        let naturalDetailsHeight = detailsScrollView.heightAnchor.constraint(equalTo: detailsStack.heightAnchor)
+        naturalDetailsHeight.priority = UILayoutPriority(749)
+        NSLayoutConstraint.activate([
+            detailsStack.topAnchor.constraint(equalTo: detailsScrollView.contentLayoutGuide.topAnchor),
+            detailsStack.leadingAnchor.constraint(equalTo: detailsScrollView.contentLayoutGuide.leadingAnchor),
+            detailsStack.trailingAnchor.constraint(equalTo: detailsScrollView.contentLayoutGuide.trailingAnchor),
+            detailsStack.bottomAnchor.constraint(equalTo: detailsScrollView.contentLayoutGuide.bottomAnchor),
+            detailsStack.widthAnchor.constraint(equalTo: detailsScrollView.frameLayoutGuide.widthAnchor),
+            naturalDetailsHeight
+        ])
+
+        contentStack.addArrangedSubview(detailsScrollView)
         contentStack.addArrangedSubview(makeButtons())
         addSubview(contentStack)
 

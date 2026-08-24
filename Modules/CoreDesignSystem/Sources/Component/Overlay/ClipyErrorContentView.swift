@@ -81,23 +81,34 @@ private extension ClipyErrorContentView {
         contentStack.alignment = .center
         contentStack.spacing = 30
         contentStack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(contentStack)
 
         if let action {
-            let actionButton = ClipyButton(variant: .secondaryMedium, title: action.title)
-            actionButton.addAction(UIAction { _ in action.handler() }, for: .touchUpInside)
-            let fittingWidth = actionButton.sizeThatFits(
-                CGSize(width: CGFloat.greatestFiniteMagnitude, height: 50)
-            ).width
-            actionButton.widthAnchor.constraint(equalToConstant: max(96, fittingWidth)).isActive = true
-            contentStack.addArrangedSubview(actionButton)
+            addActionButton(action, to: contentStack)
         }
 
-        addSubview(contentStack)
         NSLayoutConstraint.activate([
             contentStack.centerXAnchor.constraint(equalTo: centerXAnchor),
             contentStack.centerYAnchor.constraint(equalTo: centerYAnchor),
             contentStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
             contentStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20)
+        ])
+    }
+
+    func addActionButton(_ action: Action, to contentStack: UIStackView) {
+        let actionButton = ClipyButton(variant: .secondaryMedium, title: action.title)
+        actionButton.addAction(UIAction { _ in action.handler() }, for: .touchUpInside)
+        let fittingWidth = actionButton.sizeThatFits(
+            CGSize(width: CGFloat.greatestFiniteMagnitude, height: 50)
+        ).width
+        contentStack.addArrangedSubview(actionButton)
+
+        let preferredWidth = actionButton.widthAnchor.constraint(equalToConstant: max(96, fittingWidth))
+        preferredWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            actionButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 96),
+            actionButton.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -40),
+            preferredWidth
         ])
     }
 }
