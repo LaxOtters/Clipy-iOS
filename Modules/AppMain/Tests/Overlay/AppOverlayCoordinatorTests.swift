@@ -114,7 +114,7 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         XCTAssertEqual(reentrantRequestResult, .rejected(.sceneInactive))
     }
 
-    func test_dialogDisplayFailure_releasesSlotBeforeResponseAndAllowsReentrantDialog() {
+    func test_dialogDisplayFailure_releasesSlotBeforeResponseAndAllowsReentrantDialog() async {
         let host = OverlayHostSpy(dialogMountResult: .unavailable, defersDialogUnmount: true)
         let coordinator = makeOverlayCoordinator(host: host)
         var responses: [ClipyDialog.Response] = []
@@ -138,6 +138,8 @@ final class AppOverlayCoordinatorTests: XCTestCase {
             .rejected(.dialogAlreadyPresented)
         )
         XCTAssertNotNil(weakSentinel)
+
+        await Task.yield()
 
         host.completeDialogUnmount(at: 0)
 

@@ -29,6 +29,7 @@ final class AppOverlaySnackbarLifecycleRaceTests: XCTestCase {
 
         host.snackbarCallbacks[0].onAction?()
         XCTAssertNil(reentrantResult)
+        XCTAssertEqual(coordinator.enqueueSnackbar(makeFirstRequest()), .duplicateDropped)
 
         host.completeSnackbarUnmount(at: 0)
 

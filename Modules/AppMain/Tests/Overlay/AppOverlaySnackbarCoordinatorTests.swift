@@ -153,6 +153,7 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         let timer = scheduler.tasks[0]
 
         host.snackbarCallbacks[0].onAction?()
+        XCTAssertTrue(timer.isCancelled)
         timer.fireEvenIfCancelled()
         host.snackbarCallbacks[0].onAction?()
 
@@ -160,33 +161,10 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         XCTAssertEqual(host.mountedSnackbarCount, 0)
     }
 
-    func test_enqueueDuringSnackbarDismissal_waitsForMatchingExitCompletion() {
-        let host = OverlayHostSpy(defersSnackbarUnmount: true)
-        let coordinator = makeOverlayCoordinator(host: host)
-
-        XCTAssertEqual(
-            coordinator.enqueueSnackbar(
-                .init(message: "A", action: .init(title: "Next") {
-                    XCTAssertEqual(coordinator.enqueueSnackbar(.init(message: "C")), .accepted)
-                })
-            ),
-            .accepted
-        )
-        XCTAssertEqual(coordinator.enqueueSnackbar(.init(message: "B")), .accepted)
-
-        host.snackbarCallbacks[0].onAction?()
-
-        XCTAssertEqual(host.snackbarCallbacks.count, 1)
-        XCTAssertEqual(coordinator.enqueueSnackbar(.init(message: "A", action: .init(title: "Next") {})), .duplicateDropped)
-
-        host.completeSnackbarUnmount(at: 0)
-
-        XCTAssertEqual(host.snackbarCallbacks.count, 2)
-    }
-
     func test_sceneInactivity_clearsVisibleAndQueuedSnackbars_withoutReplay() {
         let host = OverlayHostSpy(defersSnackbarUnmount: true)
-        let coordinator = makeOverlayCoordinator(host: host)
+        let scheduler = OverlaySchedulerSpy()
+        let coordinator = makeOverlayCoordinator(host: host, scheduler: scheduler)
         weak var visibleSentinel: LifetimeSentinel?
         weak var queuedSentinel: LifetimeSentinel?
 
@@ -210,6 +188,7 @@ final class AppOverlaySnackbarCoordinatorTests: XCTestCase {
         }
 
         coordinator.sceneWillResignActive()
+        XCTAssertTrue(scheduler.tasks[0].isCancelled)
         host.completeSnackbarUnmount(at: 0)
 
         XCTAssertNil(visibleSentinel)

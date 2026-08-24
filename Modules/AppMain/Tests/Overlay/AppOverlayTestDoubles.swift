@@ -77,6 +77,10 @@ final class OverlayHostSpy: AppOverlayHosting {
         onSelection: @escaping (ClipyDialog.Selection, String?) -> Void,
         completion: @escaping (AppOverlayMountResult) -> Void
     ) {
+        guard mountedDialogCount == 0 else {
+            completion(.occupied)
+            return
+        }
         mountedDialogCount = 1
         events.append("dialogMounted")
         dialogCallbacks.append(onSelection)
@@ -181,12 +185,15 @@ final class OverlaySchedulerSpy: AppOverlayScheduling {
 @MainActor
 final class ScheduledTaskSpy: AppOverlayScheduledTask {
     private let action: () -> Void
+    private(set) var isCancelled = false
 
     init(action: @escaping () -> Void) {
         self.action = action
     }
 
-    func cancel() {}
+    func cancel() {
+        isCancelled = true
+    }
 
     func fireEvenIfCancelled() {
         action()

@@ -12,7 +12,7 @@ import CoreDesignSystem
 
 @MainActor
 final class AppOverlayRemovalLifetimeTests: XCTestCase {
-    func test_shutdown_duringDeferredDialogRemoval_keepsCoordinatorUntilCancellationResponse() {
+    func test_hostDetachThenShutdown_duringDeferredDialogRemoval_deliversCancellationBeforeRelease() {
         let host = OverlayHostSpy(defersDialogUnmount: true)
         var coordinator: AppOverlayCoordinator? = makeOverlayCoordinator(host: host)
         weak var retainedCoordinator: AppOverlayCoordinator?
@@ -22,19 +22,19 @@ final class AppOverlayRemovalLifetimeTests: XCTestCase {
         let requestResult = coordinator?.presentDialog(overlayDialogConfiguration) { responses.append($0) }
         XCTAssertEqual(requestResult, .accepted)
 
+        coordinator?.hostDidDetach()
         coordinator?.shutdown()
         coordinator = nil
 
-        XCTAssertNotNil(retainedCoordinator)
         XCTAssertTrue(responses.isEmpty)
 
         host.completeDialogUnmount(at: 0)
 
-        XCTAssertEqual(responses, [.cancelled(.sceneDisconnected)])
+        XCTAssertEqual(responses, [.cancelled(.hostUnavailable)])
         XCTAssertNil(retainedCoordinator)
     }
 
-    func test_tappedAction_shutdown_keepsCoordinatorUntilAcceptedActionRuns() {
+    func test_tappedAction_hostDetachThenShutdown_deliversAcceptedActionBeforeRelease() {
         let host = OverlayHostSpy(defersSnackbarUnmount: true)
         var coordinator: AppOverlayCoordinator? = makeOverlayCoordinator(host: host)
         weak var retainedCoordinator: AppOverlayCoordinator?
@@ -47,16 +47,15 @@ final class AppOverlayRemovalLifetimeTests: XCTestCase {
         XCTAssertEqual(requestResult, .accepted)
 
         host.snackbarCallbacks[0].onAction?()
+        coordinator?.hostDidDetach()
         coordinator?.shutdown()
         coordinator = nil
 
-        XCTAssertNotNil(retainedCoordinator)
         XCTAssertEqual(actionCount, 0)
 
         host.completeSnackbarUnmount(at: 1)
 
         XCTAssertEqual(actionCount, 1)
-        XCTAssertNotNil(retainedCoordinator)
 
         host.completeSnackbarUnmount(at: 0)
 

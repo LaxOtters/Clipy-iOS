@@ -155,7 +155,6 @@ private extension AppOverlayCoordinator {
         let request: ClipySnackbar.Request
         let fingerprint: SnackbarFingerprint
     }
-
     enum SnackbarCompletion {
         case dismissed
         case action(@MainActor () -> Void)
@@ -164,13 +163,11 @@ private extension AppOverlayCoordinator {
         case dismiss
         case action
     }
-
     enum SnackbarPhase {
         case entering
         case visible
         case exiting(SnackbarCompletion)
     }
-
     struct SnackbarState {
         let token: UUID
         let fingerprint: SnackbarFingerprint
@@ -186,16 +183,16 @@ private extension AppOverlayCoordinator {
         switch result {
         case .displayed:
             dialog?.phase = .visible
-        case .unavailable:
-            beginDialogDismissal(
-                token: token,
-                response: .cancelled(.displayFailed),
-                animated: false
-            )
-        case .occupied:
-            // 다른 coordinator가 올린 view는 이 coordinator가 내리지 않습니다.
-            dialog?.phase = .exiting(.cancelled(.displayFailed))
-            completeDialogRemoval(token: token)
+        case .unavailable, .occupied:
+            let removalHost = result == .unavailable ? host : nil
+            // 동기 실패에서도 .accepted를 먼저 반환하고, occupied host의 incumbent는 건드리지 않습니다.
+            Task { @MainActor [self] in
+                guard let current = dialog, current.token == token, case .entering = current.phase else {
+                    return
+                }
+                dialog?.phase = .exiting(.cancelled(.displayFailed))
+                requestDialogRemoval(token: token, animated: false, removalHost: removalHost)
+            }
         }
     }
 
@@ -213,6 +210,9 @@ private extension AppOverlayCoordinator {
             )
         case .exiting:
             // 사용자가 이미 고른 결과는 뒤늦게 들어온 scene/host 종료로 덮지 않습니다.
+            guard let removalHost else {
+                return
+            }
             requestDialogRemoval(token: current.token, animated: false, removalHost: removalHost)
         }
     }
@@ -350,14 +350,22 @@ private extension AppOverlayCoordinator {
             return
         }
         snackbarFingerprints = [current.fingerprint]
+        let wasExiting: Bool
         switch current.phase {
         case .exiting(.action):
-            break
-        case .entering, .visible, .exiting:
+            wasExiting = true
+        case .entering, .visible:
+            wasExiting = false
             // 아직 누르지 않은 action은 scene 정리와 함께 버립니다.
             visibleSnackbar?.phase = .exiting(.dismissed)
+        case .exiting:
+            wasExiting = true
         }
         visibleSnackbar?.action = nil
+        // host가 사라진 뒤 들어온 lifecycle event는 이미 요청한 removal completion을 기다립니다.
+        guard removalHost != nil || !wasExiting else {
+            return
+        }
         requestSnackbarRemoval(token: current.token, animated: false, removalHost: removalHost)
     }
 
