@@ -39,6 +39,7 @@ final class SessionWebView: UIView {
         backgroundColor = .systemBackground
 
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.scrollView.delegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.translatesAutoresizingMaskIntoConstraints = false
