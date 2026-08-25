@@ -19,6 +19,25 @@ module 구조는 `PROJECT_STRUCTURE.md`, 테스트 기준은 `TESTING_GUIDE.md`�
 - 실제로 구조가 필요해지기 전까지는 단순한 UIKit/Foundation 타입을 씁니다.
 - dependency는 필요할 때만 추가하고, 추가한 이유를 남깁니다.
 
+## 공개 API의 타입 관리
+
+공개 타입은 이름보다 먼저 관리 책임을 봅니다.
+
+- 컴포넌트나 기능 없이 독립적인 의미가 없는 보조 타입은 해당 진입점 아래 한 단계로 중첩합니다.
+  예를 들어 버튼의 표현 종류는 `ClipyButton.Variant`, 다이얼로그의 응답은
+  `ClipyDialog.Response`처럼 둡니다.
+- 여러 영역에서 독립적으로 재사용되거나 타입 자체가 호출 진입점이면 top-level에 둡니다.
+  `ClipyButton`, `ClipyTextStyle` 같은 타입을 억지로 다른 namespace 아래에 넣지 않습니다.
+- `Models`, `Types`, `Contracts`, `Common`처럼 실제 관리 책임을 드러내지 않는 namespace는 만들지 않습니다.
+- `ClipyDialog.Configuration.Button.Layout`처럼 두 단계 이상 깊어지는 중첩은 피합니다.
+  한 단계 안에서 역할을 설명할 수 없으면 타입의 책임이나 분리 기준을 다시 봅니다.
+- 중첩은 접근 제어를 대신하지 않습니다. 다른 모듈의 public API가 사용하는 타입은 중첩 여부와
+  관계없이 필요한 접근 수준을 유지합니다.
+- 타입 묶음이 커지면 `extension`으로 파일을 나눌 수 있지만, 보조 enum마다 파일을 하나씩 만들지는 않습니다.
+
+기존 API는 이 규칙만 적용하려고 한 번에 바꾸지 않습니다. 새 API와 현재 수정하는 영역부터 적용하고,
+호출부가 많은 기존 API는 별도 리팩토링 범위에서 바꿉니다.
+
 ## Swift 파일 header
 
 새 Swift 파일은 Xcode 기본 header 형태를 유지합니다.

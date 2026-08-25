@@ -10,8 +10,8 @@ import UIKit
 /// 화면의 action을 정해진 스타일과 크기로 표현하는 공용 버튼입니다.
 /// 가로 길이와 배치는 이 버튼을 사용하는 화면이 정합니다.
 public final class ClipyButton: UIButton {
-    /// 버튼의 강조 수준과 크기를 함께 고르는 유효한 조합입니다.
-    /// 비활성 모양은 별도 variant가 아니라 `isEnabled` 상태가 정합니다.
+    /// 디자인에서 허용한 버튼 모양입니다.
+    /// 비활성 스타일은 variant를 늘리지 않고 `isEnabled`로 바꿉니다.
     public enum Variant {
         case primaryMedium
         case secondaryMedium
@@ -28,10 +28,22 @@ public final class ClipyButton: UIButton {
         CGSize(width: UIView.noIntrinsicMetric, height: variant.height)
     }
 
-    private let variant: Variant
+    /// 공개 variant를 늘리지 않고 특정 화면의 primary 색만 바꿀 때 씁니다.
+    enum ColorRole {
+        case standard
+        case primary500
+    }
 
-    public init(variant: Variant, title: String) {
+    private let variant: Variant
+    private let colorRole: ColorRole
+
+    public convenience init(variant: Variant, title: String) {
+        self.init(variant: variant, title: title, colorRole: .standard)
+    }
+
+    init(variant: Variant, title: String, colorRole: ColorRole) {
         self.variant = variant
+        self.colorRole = colorRole
         super.init(frame: .zero)
 
         configuration = .plain()
@@ -63,7 +75,7 @@ public final class ClipyButton: UIButton {
 
 private extension ClipyButton {
     func updateAppearance() {
-        let appearance = variant.appearance(isEnabled: isEnabled)
+        let appearance = variant.appearance(isEnabled: isEnabled, colorRole: colorRole)
 
         backgroundColor = appearance.backgroundColor
         layer.cornerRadius = variant.cornerRadius
@@ -86,7 +98,7 @@ private extension ClipyButton {
                 including: \.uiKit
             )
         } catch {
-            // Debug에서는 변환 실패를 드러내고, Release에서는 일반 title로 대체해 버튼을 계속 사용할 수 있게 합니다.
+            // 속성 변환이 깨지면 Debug에서는 바로 보이게 하고, Release에서는 title만 남깁니다.
             assertionFailure("ClipyButton could not convert its title attributes: \(error)")
 
             buttonConfiguration.title = super.title(for: .normal) ?? ""
@@ -94,7 +106,7 @@ private extension ClipyButton {
         buttonConfiguration.baseForegroundColor = appearance.titleColor
         buttonConfiguration.cornerStyle = .fixed
         buttonConfiguration.background.backgroundColor = appearance.backgroundColor
-        // UIKit의 state color 변환을 막아 Variant가 정한 background token을 그대로 사용합니다.
+        // UIKit이 state별 색을 다시 계산하지 않게 해서 variant가 고른 background token을 그대로 씁니다.
         buttonConfiguration.background.backgroundColorTransformer = UIConfigurationColorTransformer { $0 }
         buttonConfiguration.background.cornerRadius = variant.cornerRadius
         buttonConfiguration.contentInsets = variant.contentInsets
@@ -125,33 +137,41 @@ private extension ClipyButton {
 }
 
 private extension ClipyButton.Variant {
-    func appearance(isEnabled: Bool) -> ClipyButton.Appearance {
-        switch (self, isEnabled) {
-        case (.primaryMedium, true), (.primarySmall, true):
+    func appearance(
+        isEnabled: Bool,
+        colorRole: ClipyButton.ColorRole
+    ) -> ClipyButton.Appearance {
+        switch (self, isEnabled, colorRole) {
+        case (.primaryMedium, true, .primary500):
+            ClipyButton.Appearance(
+                backgroundColor: ClipyColor.Foundation.primary500,
+                titleColor: ClipyColor.Foundation.primary50
+            )
+        case (.primaryMedium, true, .standard), (.primarySmall, true, _):
             ClipyButton.Appearance(
                 backgroundColor: ClipyColor.Foundation.primary400,
                 titleColor: ClipyColor.Foundation.primary50
             )
-        case (.primaryMedium, false):
+        case (.primaryMedium, false, _):
             ClipyButton.Appearance(
                 backgroundColor: ClipyColor.Foundation.primary300,
                 titleColor: ClipyColor.Foundation.primary100
             )
-        case (.secondaryMedium, true):
+        case (.secondaryMedium, true, _):
             ClipyButton.Appearance(
                 backgroundColor: ClipyColor.Foundation.neutral100,
                 titleColor: ClipyColor.Foundation.neutral800,
                 borderWidth: 1,
                 borderColor: ClipyColor.Foundation.neutral200
             )
-        case (.secondaryMedium, false):
+        case (.secondaryMedium, false, _):
             ClipyButton.Appearance(
                 backgroundColor: ClipyColor.Foundation.neutral50,
                 titleColor: ClipyColor.Foundation.neutral300,
                 borderWidth: 1,
                 borderColor: ClipyColor.Foundation.neutral200
             )
-        case (.primarySmall, false):
+        case (.primarySmall, false, _):
             ClipyButton.Appearance(
                 backgroundColor: ClipyColor.Foundation.neutral100,
                 titleColor: ClipyColor.Foundation.neutral800
