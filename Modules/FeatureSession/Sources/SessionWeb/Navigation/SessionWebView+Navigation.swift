@@ -41,4 +41,62 @@ extension SessionWebView: WKNavigationDelegate {
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         handleWebContentProcessTermination()
     }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        let frame: SessionWebNavigationPolicy.Frame
+        if navigationAction.targetFrame == nil {
+            frame = .newWindow
+        } else if navigationAction.targetFrame?.isMainFrame == true {
+            frame = .main
+        } else {
+            frame = .subframe
+        }
+
+        switch SessionWebNavigationPolicy.action(
+            url: navigationAction.request.url,
+            frame: frame,
+            shouldPerformDownload: navigationAction.shouldPerformDownload
+        ) {
+        case .allow:
+            decisionHandler(.allow)
+        case .cancel:
+            decisionHandler(.cancel)
+        case let .confirmExternalOpen(url):
+            decisionHandler(.cancel)
+            presentExternalOpenConfirmation(url: url)
+        case let .confirmBrowserFallback(url):
+            decisionHandler(.cancel)
+            presentBrowserFallbackConfirmation(url: url)
+        case .showUnsupportedDownloadMessage:
+            decisionHandler(.cancel)
+            showUnsupportedDownloadMessage()
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        switch SessionWebNavigationPolicy.response(
+            url: navigationResponse.response.url,
+            isForMainFrame: navigationResponse.isForMainFrame,
+            canShowMIMEType: navigationResponse.canShowMIMEType
+        ) {
+        case .allow:
+            decisionHandler(.allow)
+        case .cancel:
+            decisionHandler(.cancel)
+        case let .confirmBrowserFallback(url):
+            decisionHandler(.cancel)
+            presentBrowserFallbackConfirmation(url: url)
+        case .showUnsupportedDownloadMessage:
+            decisionHandler(.cancel)
+            showUnsupportedDownloadMessage()
+        }
+    }
 }

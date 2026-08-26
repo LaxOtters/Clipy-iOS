@@ -53,6 +53,78 @@ final class SessionWebViewNewWindowNavigationTests: XCTestCase {
         })
     }
 
+    func test_newWindowDownloadIntent_doesNotLoadRequestInMain() {
+        XCTAssertFalse(
+            SessionWebView.shouldLoadNewWindowRequestInMain(
+                URL(string: "https://shop.example/export.csv"),
+                shouldPerformDownload: true
+            )
+        )
+    }
+
+    func test_newWindowDownloadIntent_requestsBrowserFallback_withoutLoadingDestinationInMain() throws {
+        let server = try LocalHTTPServer()
+        let harness = SessionWebViewNewWindowHarness()
+        addTeardownBlock {
+            harness.tearDown()
+            server.stop()
+        }
+        let startURL = server.url(path: "/download-start")
+        let dialogPresented = expectation(description: "browser fallback dialog")
+        let destinationReceived = expectation(description: "download destination request")
+        destinationReceived.isInverted = true
+        harness.overlay.onDialogPresented = { dialogPresented.fulfill() }
+        server.observeReceipts { request in
+            if request.path == "/download-destination" {
+                destinationReceived.fulfill()
+            }
+        }
+
+        try waitForNavigationFinish(on: harness.sessionWebView, step: "load download fixture") {
+            harness.sessionWebView.load(url: startURL)
+        }
+
+        try evaluateJavaScript(
+            "document.getElementById('download-link').click()",
+            in: harness.mainWebView
+        )
+
+        XCTAssertEqual(XCTWaiter.wait(for: [dialogPresented], timeout: 10), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [destinationReceived], timeout: 0.5), .completed)
+        XCTAssertEqual(harness.sessionWebView.currentURL, startURL)
+        XCTAssertEqual(
+            harness.overlay.dialogConfigurations,
+            [SessionWebView.browserFallbackConfiguration]
+        )
+        XCTAssertTrue(server.receipts.filter { $0.path == "/download-destination" }.isEmpty)
+        XCTAssertTrue(harness.opener.openedURLs.isEmpty)
+        XCTAssertTrue(harness.overlay.snackbarRequests.isEmpty)
+    }
+
+    func test_unsupportedMainFrameResponse_requestsBrowserFallbackOnce() throws {
+        let server = try LocalHTTPServer()
+        let harness = SessionWebViewNewWindowHarness()
+        addTeardownBlock {
+            harness.tearDown()
+            server.stop()
+        }
+        let url = server.url(path: "/unsupported-download")
+        let dialogPresented = expectation(description: "browser fallback dialog")
+        harness.overlay.onDialogPresented = { dialogPresented.fulfill() }
+
+        harness.sessionWebView.load(url: url)
+
+        XCTAssertEqual(XCTWaiter.wait(for: [dialogPresented], timeout: 10), .completed)
+        XCTAssertEqual(
+            harness.overlay.dialogConfigurations,
+            [SessionWebView.browserFallbackConfiguration]
+        )
+        XCTAssertEqual(
+            server.receipts.filter { $0.path == "/unsupported-download" },
+            [LocalHTTPRequest(method: "GET", path: "/unsupported-download", body: Data())]
+        )
+    }
+
     func test_newWindowGET_loadsDestinationInSessionWebView_andKeepsNativeBackHistory() throws {
         let server = try LocalHTTPServer()
         let harness = SessionWebViewNewWindowHarness()

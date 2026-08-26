@@ -71,6 +71,7 @@ final class LocalHTTPServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "clipy.session-web-new-window-http-server")
     private let receiptLock = NSLock()
     private var storedReceipts: [LocalHTTPRequest] = []
+    private var receiptObserver: (@Sendable (LocalHTTPRequest) -> Void)?
     private(set) var port: UInt16 = 0
 
     var receipts: [LocalHTTPRequest] {
@@ -116,6 +117,12 @@ final class LocalHTTPServer: @unchecked Sendable {
         listener.cancel()
     }
 
+    func observeReceipts(_ observer: @escaping @Sendable (LocalHTTPRequest) -> Void) {
+        receiptLock.withLock {
+            receiptObserver = observer
+        }
+    }
+
     private func accept(_ connection: NWConnection) {
         connection.start(queue: queue)
         receiveRequest(on: connection, accumulatedData: Data())
@@ -134,9 +141,11 @@ final class LocalHTTPServer: @unchecked Sendable {
             }
 
             if let request = Self.parseRequest(from: requestData) {
-                receiptLock.withLock {
+                let observer = receiptLock.withLock {
                     self.storedReceipts.append(request)
+                    return self.receiptObserver
                 }
+                observer?(request)
                 sendResponse(for: request, on: connection)
                 return
             }
@@ -152,9 +161,13 @@ final class LocalHTTPServer: @unchecked Sendable {
 
     private func sendResponse(for request: LocalHTTPRequest, on connection: NWConnection) {
         let response = response(for: request)
+        let additionalHeaders = response.additionalHeaders
+            .map { "\($0.name): \($0.value)\r\n" }
+            .joined()
         let header = Data((
             "HTTP/1.1 \(response.status)\r\n"
                 + "Content-Type: \(response.contentType)\r\n"
+                + additionalHeaders
                 + "Content-Length: \(response.body.count)\r\n"
                 + "Connection: close\r\n"
                 + "\r\n"
@@ -186,6 +199,15 @@ final class LocalHTTPServer: @unchecked Sendable {
                 contentType: "image/svg+xml",
                 body: Data(svg.utf8)
             )
+        case "/unsupported-download":
+            return LocalHTTPResponse(
+                status: "200 OK",
+                contentType: "application/octet-stream",
+                body: Data([0x00, 0x01, 0x02, 0x03]),
+                additionalHeaders: [
+                    .init(name: "Content-Disposition", value: "attachment; filename=fixture.bin")
+                ]
+            )
         default:
             return .html(status: "200 OK", body: responseHTML(for: request))
         }
@@ -206,6 +228,15 @@ final class LocalHTTPServer: @unchecked Sendable {
                     <input name="item" value="clipy">
                     <input name="count" value="1">
                 </form>
+            </body></html>
+            """
+        case "/download-start":
+            return """
+            <html><body>
+                <a id="download-link"
+                   href="\(url(path: "/download-destination"))"
+                   target="_blank"
+                   download="fixture.bin">download</a>
             </body></html>
             """
         default:
@@ -251,9 +282,27 @@ final class LocalHTTPServer: @unchecked Sendable {
 }
 
 private struct LocalHTTPResponse {
+    struct Header {
+        let name: String
+        let value: String
+    }
+
     let status: String
     let contentType: String
     let body: Data
+    let additionalHeaders: [Header]
+
+    init(
+        status: String,
+        contentType: String,
+        body: Data,
+        additionalHeaders: [Header] = []
+    ) {
+        self.status = status
+        self.contentType = contentType
+        self.body = body
+        self.additionalHeaders = additionalHeaders
+    }
 
     static func html(status: String, body: String) -> Self {
         Self(
