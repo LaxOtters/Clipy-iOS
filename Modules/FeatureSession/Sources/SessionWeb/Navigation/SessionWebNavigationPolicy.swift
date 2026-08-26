@@ -25,7 +25,6 @@ enum SessionWebNavigationPolicy {
     enum Response: Equatable {
         case allow
         case cancel
-        case confirmBrowserFallback(URL)
         case showUnsupportedDownloadMessage
     }
 
@@ -51,8 +50,15 @@ enum SessionWebNavigationPolicy {
             return .confirmBrowserFallback(url)
         }
 
-        if isWebKitInternalScheme(scheme) {
+        if isPassiveWebKitInternalScheme(scheme) {
             return frame == .newWindow ? .cancel : .allow
+        }
+
+        if isLocalContentScheme(scheme) {
+            guard shouldPerformDownload else {
+                return frame == .newWindow ? .cancel : .allow
+            }
+            return frame == .subframe ? .cancel : .showUnsupportedDownloadMessage
         }
 
         guard frame != .subframe, let url else {
@@ -62,20 +68,14 @@ enum SessionWebNavigationPolicy {
     }
 
     static func response(
-        url: URL?,
         isForMainFrame: Bool,
-        canShowMIMEType: Bool
+        canShowMIMEType: Bool,
+        contentDisposition: String?
     ) -> Response {
-        guard !canShowMIMEType else {
+        guard isAttachment(contentDisposition) || !canShowMIMEType else {
             return .allow
         }
-        guard isForMainFrame else {
-            return .cancel
-        }
-        guard let url, isBrowserFallbackEligible(url) else {
-            return .showUnsupportedDownloadMessage
-        }
-        return .confirmBrowserFallback(url)
+        return isForMainFrame ? .showUnsupportedDownloadMessage : .cancel
     }
 
     static func shouldLoadNewWindowRequestInMain(
@@ -92,8 +92,12 @@ enum SessionWebNavigationPolicy {
         scheme == "http" || scheme == "https"
     }
 
-    private static func isWebKitInternalScheme(_ scheme: String) -> Bool {
-        ["about", "javascript", "blob", "data", "file"].contains(scheme)
+    private static func isPassiveWebKitInternalScheme(_ scheme: String) -> Bool {
+        scheme == "about" || scheme == "javascript"
+    }
+
+    private static func isLocalContentScheme(_ scheme: String) -> Bool {
+        scheme == "blob" || scheme == "data" || scheme == "file"
     }
 
     private static func isBrowserFallbackEligible(_ url: URL) -> Bool {
@@ -104,5 +108,13 @@ enum SessionWebNavigationPolicy {
             return false
         }
         return !host.isEmpty
+    }
+
+    private static func isAttachment(_ contentDisposition: String?) -> Bool {
+        contentDisposition?
+            .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() == "attachment"
     }
 }

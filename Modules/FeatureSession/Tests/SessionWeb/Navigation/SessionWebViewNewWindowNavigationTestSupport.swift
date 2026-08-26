@@ -199,13 +199,22 @@ final class LocalHTTPServer: @unchecked Sendable {
                 contentType: "image/svg+xml",
                 body: Data(svg.utf8)
             )
-        case "/unsupported-download":
+        case "/unsupported-download", "/unsupported-post":
             return LocalHTTPResponse(
                 status: "200 OK",
                 contentType: "application/octet-stream",
                 body: Data([0x00, 0x01, 0x02, 0x03]),
                 additionalHeaders: [
                     .init(name: "Content-Disposition", value: "attachment; filename=fixture.bin")
+                ]
+            )
+        case "/displayable-attachment":
+            return LocalHTTPResponse(
+                status: "200 OK",
+                contentType: "text/html; charset=utf-8",
+                body: Data("<html><body>attachment</body></html>".utf8),
+                additionalHeaders: [
+                    .init(name: "content-disposition", value: "Attachment; filename=fixture.html")
                 ]
             )
         default:
@@ -237,6 +246,15 @@ final class LocalHTTPServer: @unchecked Sendable {
                    href="\(url(path: "/download-destination"))"
                    target="_blank"
                    download="fixture.bin">download</a>
+            </body></html>
+            """
+        case "/unsupported-post-start":
+            return """
+            <html><body>
+                <form id="unsupported-post-form" action="\(url(path: "/unsupported-post"))" method="post">
+                    <input name="item" value="clipy">
+                    <input name="count" value="1">
+                </form>
             </body></html>
             """
         default:

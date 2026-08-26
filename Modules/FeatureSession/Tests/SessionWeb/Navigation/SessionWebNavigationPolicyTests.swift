@@ -40,33 +40,41 @@ final class SessionWebNavigationPolicyTests: XCTestCase {
     }
 
     func test_actionPolicy_handlesHTTPDownload_byFrameAndHostEligibility() throws {
-        let eligibleURL = try XCTUnwrap(URL(string: "https://example.com/file"))
+        let eligibleURLs = try [
+            "https://example.com/file",
+            "http://localhost/file",
+            "https://intranet/file",
+            "https://127.0.0.1/file",
+            "https://user:password@example.com/file"
+        ].map { try XCTUnwrap(URL(string: $0)) }
         let ineligibleURL = try XCTUnwrap(URL(string: "https:file"))
 
-        XCTAssertEqual(
-            SessionWebNavigationPolicy.action(
-                url: eligibleURL,
-                frame: .main,
-                shouldPerformDownload: true
-            ),
-            .confirmBrowserFallback(eligibleURL)
-        )
-        XCTAssertEqual(
-            SessionWebNavigationPolicy.action(
-                url: eligibleURL,
-                frame: .newWindow,
-                shouldPerformDownload: true
-            ),
-            .confirmBrowserFallback(eligibleURL)
-        )
-        XCTAssertEqual(
-            SessionWebNavigationPolicy.action(
-                url: eligibleURL,
-                frame: .subframe,
-                shouldPerformDownload: true
-            ),
-            .cancel
-        )
+        for eligibleURL in eligibleURLs {
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: eligibleURL,
+                    frame: .main,
+                    shouldPerformDownload: true
+                ),
+                .confirmBrowserFallback(eligibleURL)
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: eligibleURL,
+                    frame: .newWindow,
+                    shouldPerformDownload: true
+                ),
+                .confirmBrowserFallback(eligibleURL)
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: eligibleURL,
+                    frame: .subframe,
+                    shouldPerformDownload: true
+                ),
+                .cancel
+            )
+        }
         XCTAssertEqual(
             SessionWebNavigationPolicy.action(
                 url: ineligibleURL,
@@ -85,14 +93,11 @@ final class SessionWebNavigationPolicyTests: XCTestCase {
         )
     }
 
-    func test_actionPolicy_keepsOrdinaryHTTPNavigationAndInternalSchemesInsideWebKit() throws {
+    func test_actionPolicy_keepsOrdinaryHTTPNavigationAndPassiveInternalSchemesInsideWebKit() throws {
         let webURL = try XCTUnwrap(URL(string: "HTTPS://example.com/page"))
-        let internalURLs = try [
+        let passiveInternalURLs = try [
             "about:blank",
-            "javascript:void(0)",
-            "blob:https://example.com/id",
-            "data:text/plain,a",
-            "file:///tmp/a"
+            "javascript:void(0)"
         ].map { try XCTUnwrap(URL(string: $0)) }
 
         for frame in [
@@ -110,7 +115,7 @@ final class SessionWebNavigationPolicyTests: XCTestCase {
             )
         }
 
-        for url in internalURLs {
+        for url in passiveInternalURLs {
             XCTAssertEqual(
                 SessionWebNavigationPolicy.action(
                     url: url,
@@ -132,6 +137,76 @@ final class SessionWebNavigationPolicyTests: XCTestCase {
                     url: url,
                     frame: .subframe,
                     shouldPerformDownload: true
+                ),
+                .allow
+            )
+        }
+    }
+
+    func test_actionPolicy_rejectsLocalContentDownloadIntent_withoutUserVisibleSubframeEffect() throws {
+        let localContentURLs = try [
+            "blob:https://example.com/id",
+            "data:text/plain,a",
+            "file:///tmp/a"
+        ].map { try XCTUnwrap(URL(string: $0)) }
+
+        for url in localContentURLs {
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .main,
+                    shouldPerformDownload: true
+                ),
+                .showUnsupportedDownloadMessage
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .newWindow,
+                    shouldPerformDownload: true
+                ),
+                .showUnsupportedDownloadMessage
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .subframe,
+                    shouldPerformDownload: true
+                ),
+                .cancel
+            )
+        }
+    }
+
+    func test_actionPolicy_keepsLocalContentNavigationNative_withoutDownloadIntent() throws {
+        let localContentURLs = try [
+            "blob:https://example.com/id",
+            "data:text/plain,a",
+            "file:///tmp/a"
+        ].map { try XCTUnwrap(URL(string: $0)) }
+
+        for url in localContentURLs {
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .main,
+                    shouldPerformDownload: false
+                ),
+                .allow
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .newWindow,
+                    shouldPerformDownload: false
+                ),
+                .cancel
+            )
+            XCTAssertEqual(
+                SessionWebNavigationPolicy.action(
+                    url: url,
+                    frame: .subframe,
+                    shouldPerformDownload: false
                 ),
                 .allow
             )
@@ -165,61 +240,4 @@ final class SessionWebNavigationPolicyTests: XCTestCase {
         )
     }
 
-    func test_responsePolicy_allowsDisplayableContent_andSilencesUnsupportedSubframes() throws {
-        let url = try XCTUnwrap(URL(string: "https://example.com/attachment"))
-
-        XCTAssertEqual(
-            SessionWebNavigationPolicy.response(
-                url: url,
-                isForMainFrame: true,
-                canShowMIMEType: true
-            ),
-            .allow
-        )
-        XCTAssertEqual(
-            SessionWebNavigationPolicy.response(
-                url: url,
-                isForMainFrame: false,
-                canShowMIMEType: false
-            ),
-            .cancel
-        )
-    }
-
-    func test_responsePolicy_usesFinalMainFrameURL_forBrowserFallbackEligibility() throws {
-        let eligibleURLs = try [
-            "https://example.com/file",
-            "http://localhost/file",
-            "https://intranet/file",
-            "https://127.0.0.1/file",
-            "https://user:password@example.com/file"
-        ].map { try XCTUnwrap(URL(string: $0)) }
-        let ineligibleURLs = try [
-            "https:file",
-            "blob:https://example.com/id",
-            "file:///tmp/file"
-        ].map { try XCTUnwrap(URL(string: $0)) }
-
-        for url in eligibleURLs {
-            XCTAssertEqual(
-                SessionWebNavigationPolicy.response(
-                    url: url,
-                    isForMainFrame: true,
-                    canShowMIMEType: false
-                ),
-                .confirmBrowserFallback(url)
-            )
-        }
-
-        for url in ineligibleURLs {
-            XCTAssertEqual(
-                SessionWebNavigationPolicy.response(
-                    url: url,
-                    isForMainFrame: true,
-                    canShowMIMEType: false
-                ),
-                .showUnsupportedDownloadMessage
-            )
-        }
-    }
 }

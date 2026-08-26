@@ -17,6 +17,7 @@ import RxSwift
 final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
     var rejection: ClipyDialog.RequestRejection?
     var onDialogPresented: (() -> Void)?
+    var onSnackbarEnqueued: ((ClipySnackbar.Request) -> Void)?
     var onCancelDialog: ((ClipyDialog.RequestID) -> Void)?
     var respondsToCancellation = true
 
@@ -62,6 +63,7 @@ final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
 
     func enqueueSnackbar(_ request: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
         snackbarRequests.append(request)
+        onSnackbarEnqueued?(request)
         return .accepted
     }
 

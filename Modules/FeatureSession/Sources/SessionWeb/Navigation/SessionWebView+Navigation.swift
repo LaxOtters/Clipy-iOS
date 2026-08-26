@@ -82,18 +82,18 @@ extension SessionWebView: WKNavigationDelegate {
         decidePolicyFor navigationResponse: WKNavigationResponse,
         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
     ) {
+        let contentDisposition = (navigationResponse.response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Disposition")
+
         switch SessionWebNavigationPolicy.response(
-            url: navigationResponse.response.url,
             isForMainFrame: navigationResponse.isForMainFrame,
-            canShowMIMEType: navigationResponse.canShowMIMEType
+            canShowMIMEType: navigationResponse.canShowMIMEType,
+            contentDisposition: contentDisposition
         ) {
         case .allow:
             decisionHandler(.allow)
         case .cancel:
             decisionHandler(.cancel)
-        case let .confirmBrowserFallback(url):
-            decisionHandler(.cancel)
-            presentBrowserFallbackConfirmation(url: url)
         case .showUnsupportedDownloadMessage:
             decisionHandler(.cancel)
             showUnsupportedDownloadMessage()
