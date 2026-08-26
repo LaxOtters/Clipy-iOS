@@ -12,6 +12,18 @@ import XCTest
 
 @MainActor
 final class ClipyOverlayContractTests: XCTestCase {
+    func test_dialogRequestID_isConstructibleAndKeepsRequestIdentity() {
+        let requestID = ClipyDialog.RequestID()
+        let anotherRequestID = ClipyDialog.RequestID()
+
+        XCTAssertNotEqual(requestID, anotherRequestID)
+        XCTAssertEqual(ClipyDialog.RequestResult.accepted(requestID), .accepted(requestID))
+        XCTAssertEqual(
+            ClipyDialog.Response.cancelled(.requestCancelled),
+            .cancelled(.requestCancelled)
+        )
+    }
+
     func test_websiteRequestDialog_usesPrimary500_withoutChangingPlainDialogPrimaryColor() throws {
         let plainDialog = ClipyDialogView(
             configuration: .message(

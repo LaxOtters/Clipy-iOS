@@ -18,6 +18,9 @@ public protocol ClipyOverlayRequesting: AnyObject {
         response: @escaping @MainActor (ClipyDialog.Response) -> Void
     ) -> ClipyDialog.RequestResult
 
+    /// 같은 coordinator에서 수락했고 아직 사용자 선택이나 다른 cancellation으로 닫히기 시작하지 않은 Dialog만 취소합니다.
+    func cancelDialog(_ requestID: ClipyDialog.RequestID)
+
     /// Snackbar는 scene 안에서 FIFO로 보여줍니다.
     /// message와 action title이 UTF-8 byte 단위로 같으면 중복으로 보고, 거절한 요청의 action은 저장하지 않습니다.
     @discardableResult
