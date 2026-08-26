@@ -309,6 +309,7 @@ extension SessionWebView {
     }
 
     func externalOpenAction(for url: URL) -> @MainActor () -> Void {
+        // primary 선택 뒤에는 Session이 닫혀도 openURL 요청은 진행하고, 늦은 실패 안내만 버립니다.
         let openURL = openURL
         return { [weak self] in
             Task { [weak self, openURL] in

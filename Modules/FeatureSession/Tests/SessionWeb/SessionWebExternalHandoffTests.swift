@@ -56,6 +56,24 @@ final class SessionWebExternalHandoffTests: XCTestCase {
         XCTAssertTrue(opener.openedURLs.isEmpty)
     }
 
+    func test_endingSessionBeforeExternalSelection_cancelsRequest_withoutCallingOpener() throws {
+        let overlay = SessionOverlayRequesterSpy()
+        let opener = SessionURLOpenerSpy()
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: overlay, opener: opener)
+        )
+        let url = try XCTUnwrap(URL(string: "custom-scheme://continue"))
+
+        sut.presentExternalOpenConfirmation(url: url)
+        let requestID = try XCTUnwrap(overlay.latestRequestID)
+
+        sut.endSession()
+
+        XCTAssertEqual(overlay.cancelledRequestIDs, [requestID])
+        XCTAssertTrue(opener.openedURLs.isEmpty)
+        XCTAssertTrue(overlay.snackbarRequests.isEmpty)
+    }
+
     func test_failedExternalOpen_whileSessionActive_showsFailureMessage() async throws {
         let overlay = SessionOverlayRequesterSpy()
         let opener = SessionURLOpenerSpy()
