@@ -40,9 +40,8 @@ final class AppOverlayContainerViewControllerTests: XCTestCase {
 
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(true) }
-        XCTAssertEqual(
-            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) },
-            .accepted
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
         )
 
         window.rootViewController = nil

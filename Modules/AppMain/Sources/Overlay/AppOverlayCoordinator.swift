@@ -46,19 +46,19 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
         guard dialog == nil else { return .rejected(.dialogAlreadyPresented) }
         guard isSceneActive else { return .rejected(.sceneInactive) }
         guard !isShutdown, let host, host.isOverlayHostAvailable else { return .rejected(.hostUnavailable) }
-        let token = UUID()
-        dialog = DialogState(token: token, response: response, ownsHostedView: false, phase: .entering)
+        let requestID = ClipyDialog.RequestID()
+        dialog = DialogState(requestID: requestID, response: response, ownsHostedView: false, phase: .entering)
         let admission = host.mountDialog(
             configuration: configuration,
             onSelection: { [weak self] selection, promptText in
                 self?.beginDialogDismissal(
-                    token: token,
+                    requestID: requestID,
                     response: .selected(button: selection, promptText: promptText),
                     animated: true
                 )
             },
             completion: { [weak self] result in
-                self?.completeDialogEntry(token: token, result: result)
+                self?.completeDialogEntry(requestID: requestID, result: result)
             }
         )
         guard admission == .accepted else {
@@ -67,7 +67,12 @@ final class AppOverlayCoordinator: ClipyOverlayRequesting {
             return .rejected(rejection)
         }
         dialog?.ownsHostedView = true
-        return .accepted
+        return .accepted(requestID)
+    }
+
+    func cancelDialog(_ requestID: ClipyDialog.RequestID) {
+        guard dialog?.requestID == requestID else { return }
+        beginDialogDismissal(requestID: requestID, response: .cancelled(.requestCancelled), animated: false)
     }
 
     @discardableResult
@@ -126,14 +131,12 @@ private extension AppOverlayCoordinator {
         case entering, visible
         case exiting(ClipyDialog.Response)
     }
-
     struct DialogState {
-        let token: UUID
+        let requestID: ClipyDialog.RequestID
         let response: @MainActor (ClipyDialog.Response) -> Void
         var ownsHostedView: Bool
         var phase: DialogPhase
     }
-
     struct SnackbarFingerprint: Hashable {
         let message: [UInt8]
         let actionTitle: [UInt8]?
@@ -171,30 +174,28 @@ private extension AppOverlayCoordinator {
         var phase: SnackbarPhase
     }
 
-    func completeDialogEntry(token: UUID, result: AppOverlayMountResult) {
-        guard let current = dialog, current.token == token, case .entering = current.phase else { return }
+    func completeDialogEntry(requestID: ClipyDialog.RequestID, result: AppOverlayMountResult) {
+        guard let current = dialog, current.requestID == requestID, case .entering = current.phase else { return }
         switch result {
         case .displayed:
             dialog?.phase = .visible
         case .unavailable:
-            failDialogEntry(token: token)
+            failDialogEntry(requestID: requestID)
         }
     }
-
-    func failDialogEntry(token: UUID) {
-        guard let current = dialog, current.token == token, case .entering = current.phase else { return }
+    func failDialogEntry(requestID: ClipyDialog.RequestID) {
+        guard let current = dialog, current.requestID == requestID, case .entering = current.phase else { return }
         dialog?.ownsHostedView = true
         dialog?.phase = .exiting(.cancelled(.displayFailed))
         let removalHost = host
         // 동기 표시 실패에서도 .accepted를 먼저 반환한 뒤 response를 전달합니다.
         DispatchQueue.main.async { [self] in
-            guard let current = dialog, current.token == token, case .exiting = current.phase else {
+            guard let current = dialog, current.requestID == requestID, case .exiting = current.phase else {
                 return
             }
-            requestDialogRemoval(token: token, animated: false, removalHost: removalHost)
+            requestDialogRemoval(requestID: requestID, animated: false, removalHost: removalHost)
         }
     }
-
     func cancelDialog(reason: ClipyDialog.CancellationReason, removalHost: AppOverlayHosting?) {
         guard let current = dialog else {
             return
@@ -202,7 +203,7 @@ private extension AppOverlayCoordinator {
         switch current.phase {
         case .entering, .visible:
             beginDialogDismissal(
-                token: current.token,
+                requestID: current.requestID,
                 response: .cancelled(reason),
                 animated: false,
                 removalHost: removalHost
@@ -210,24 +211,24 @@ private extension AppOverlayCoordinator {
         case .exiting:
             // 사용자가 이미 고른 결과는 뒤늦게 들어온 scene/host 종료로 덮지 않습니다.
             guard current.ownsHostedView, let removalHost else { return }
-            requestDialogRemoval(token: current.token, animated: false, removalHost: removalHost)
+            requestDialogRemoval(requestID: current.requestID, animated: false, removalHost: removalHost)
         }
     }
 
     func beginDialogDismissal(
-        token: UUID,
+        requestID: ClipyDialog.RequestID,
         response: ClipyDialog.Response,
         animated: Bool,
         removalHost: AppOverlayHosting? = nil
     ) {
-        guard let current = dialog, current.token == token else {
+        guard let current = dialog, current.requestID == requestID else {
             return
         }
         switch current.phase {
         case .entering, .visible:
             dialog?.phase = .exiting(response)
             requestDialogRemoval(
-                token: token,
+                requestID: requestID,
                 animated: animated,
                 removalHost: removalHost ?? host
             )
@@ -237,21 +238,20 @@ private extension AppOverlayCoordinator {
     }
 
     func requestDialogRemoval(
-        token: UUID,
+        requestID: ClipyDialog.RequestID,
         animated: Bool,
         removalHost: AppOverlayHosting?
     ) {
         guard let removalHost else {
-            completeDialogRemoval(token: token)
+            completeDialogRemoval(requestID: requestID)
             return
         }
         removalHost.unmountDialog(animated: animated) { [self] in
-            completeDialogRemoval(token: token)
+            completeDialogRemoval(requestID: requestID)
         }
     }
-
-    func completeDialogRemoval(token: UUID) {
-        guard let current = dialog, current.token == token, case let .exiting(response) = current.phase else {
+    func completeDialogRemoval(requestID: ClipyDialog.RequestID) {
+        guard let current = dialog, current.requestID == requestID, case let .exiting(response) = current.phase else {
             return
         }
         // response 안에서 새 Dialog를 바로 띄울 수 있게, callback 전에 자리를 먼저 비웁니다.

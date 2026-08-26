@@ -332,7 +332,7 @@ extension AppOverlaySnackbarCoordinatorTests {
         let scheduler = OverlaySchedulerSpy()
         let coordinator = makeOverlayCoordinator(host: host, scheduler: scheduler)
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { _ in }, .accepted)
+        assertDialogRequestAccepted(coordinator.presentDialog(overlayDialogConfiguration) { _ in })
         XCTAssertEqual(coordinator.enqueueSnackbar(.init(message: "A")), .accepted)
         XCTAssertEqual(coordinator.enqueueSnackbar(.init(message: "B")), .accepted)
 
