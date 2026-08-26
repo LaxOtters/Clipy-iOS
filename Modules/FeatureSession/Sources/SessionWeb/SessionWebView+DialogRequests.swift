@@ -1,5 +1,5 @@
 //
-//  SessionWebView+JavaScriptDialogs.swift
+//  SessionWebView+DialogRequests.swift
 //  Clipy
 //
 //  Created by 박민서 on 8/26/26.
@@ -16,7 +16,7 @@ extension SessionWebView {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping () -> Void
     ) {
-        presentJavaScriptDialog(
+        presentDialog(
             Self.alertConfiguration(message: message, sourceURL: frame.request.url),
             onResponse: { _ in completionHandler() },
             onUnavailable: completionHandler
@@ -29,7 +29,7 @@ extension SessionWebView {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        presentJavaScriptDialog(
+        presentDialog(
             Self.confirmConfiguration(message: message, sourceURL: frame.request.url),
             onResponse: { response in
                 completionHandler(Self.confirmResult(for: response))
@@ -45,7 +45,7 @@ extension SessionWebView {
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping (String?) -> Void
     ) {
-        presentJavaScriptDialog(
+        presentDialog(
             Self.promptConfiguration(
                 message: prompt,
                 defaultText: defaultText,
@@ -98,6 +98,32 @@ extension SessionWebView {
         )
     }
 
+    static var externalOpenConfiguration: ClipyDialog.Configuration {
+        .message(
+            presentation: .plain,
+            title: "Open external app?",
+            body: "Clipy will open another app to continue.",
+            buttons: .dual(primaryTitle: "Continue", secondaryTitle: "Cancel")
+        )
+    }
+
+    static var browserFallbackConfiguration: ClipyDialog.Configuration {
+        .message(
+            presentation: .plain,
+            title: "Open in browser?",
+            body: "Downloads aren't supported in Clipy.",
+            buttons: .dual(primaryTitle: "Open in browser", secondaryTitle: "Cancel")
+        )
+    }
+
+    func presentExternalOpenConfirmation(url: URL) {
+        presentURLConfirmation(configuration: Self.externalOpenConfiguration, url: url)
+    }
+
+    func presentBrowserFallbackConfirmation(url: URL) {
+        presentURLConfirmation(configuration: Self.browserFallbackConfiguration, url: url)
+    }
+
     static func confirmResult(for response: ClipyDialog.Response) -> Bool {
         guard case let .selected(button, _) = response else {
             return false
@@ -123,5 +149,22 @@ extension SessionWebView {
         }
 
         return .websiteRequest(sourceText: sourceText)
+    }
+
+    private func presentURLConfirmation(
+        configuration: ClipyDialog.Configuration,
+        url: URL
+    ) {
+        let openExternalURL = externalOpenAction(for: url)
+        presentDialog(
+            configuration,
+            onResponse: { response in
+                guard case .selected(.primary, _) = response else {
+                    return
+                }
+                openExternalURL()
+            },
+            onUnavailable: {}
+        )
     }
 }

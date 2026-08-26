@@ -13,6 +13,7 @@ import RxSwift
 
 @testable import FeatureSession
 
+@MainActor
 final class SessionWebViewNewWindowNavigationTests: XCTestCase {
     func test_httpAndHttpsURLs_loadInMain_forNewWindowNavigation() {
         XCTAssertTrue(

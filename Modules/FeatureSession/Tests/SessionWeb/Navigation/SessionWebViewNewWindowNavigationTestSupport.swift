@@ -16,11 +16,11 @@ enum NewWindowNavigationTestError: Error {
     case timedOut
 }
 
+@MainActor
 final class SessionWebViewNewWindowHarness {
-    let sessionWebView = SessionWebView(
-        frame: CGRect(x: 0, y: 0, width: 390, height: 760),
-        overlayRequester: SessionOverlayRequesterSpy()
-    )
+    let overlay: SessionOverlayRequesterSpy
+    let opener: SessionURLOpenerSpy
+    let sessionWebView: SessionWebView
 
     var mainWebView: WKWebView {
         get throws {
@@ -35,15 +35,20 @@ final class SessionWebViewNewWindowHarness {
     private var isTornDown = false
 
     init() {
+        let overlay = SessionOverlayRequesterSpy()
+        let opener = SessionURLOpenerSpy()
+        let sessionWebView = SessionWebView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+            dependencies: makeSessionDependencies(overlay: overlay, opener: opener)
+        )
+        self.overlay = overlay
+        self.opener = opener
+        self.sessionWebView = sessionWebView
         window = UIWindow(frame: sessionWebView.bounds)
         let viewController = UIViewController()
         viewController.view.addSubview(sessionWebView)
         window.rootViewController = viewController
         window.isHidden = false
-    }
-
-    deinit {
-        tearDown()
     }
 
     func tearDown() {

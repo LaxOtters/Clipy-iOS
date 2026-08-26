@@ -18,7 +18,7 @@ import RxSwift
 final class SessionWebRecoveryPresentationTests: XCTestCase {
     func test_provisionalFailure_withUsablePage_enqueuesActionlessSnackbar() throws {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         let currentURL = try loadFixture(on: sut)
         let error = navigationError(.cannotConnectToHost)
 
@@ -32,7 +32,9 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
     }
 
     func test_mountedError_isReplacedPreservedForCancelAndRemovedOnFinish() {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: SessionOverlayRequesterSpy())
+        )
         let webView = nativeWebView(in: sut)
 
         sut.handleNavigationFailure(
@@ -65,7 +67,7 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
 
     func test_homeRecovery_marksSessionInactiveBeforeRoute_andClaimsActionOnce() throws {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var routeCount = 0
         sut.onRecoveryGoHome = {
             routeCount += 1
@@ -91,7 +93,9 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
     }
 
     func test_processTermination_replacesMountedOrdinaryError() {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: SessionOverlayRequesterSpy())
+        )
         sut.handleNavigationFailure(
             .committed(SessionWebNavigationFailureContext(error: navigationError(.timedOut)))
         )
@@ -104,7 +108,9 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
     }
 
     func test_retryAction_performsNativeReload_whenTappedRepeatedly() throws {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: SessionOverlayRequesterSpy())
+        )
         _ = try loadFixture(on: sut)
         XCTAssertEqual(try navigationType(in: sut), "navigate")
         sut.handleNavigationFailure(
@@ -121,7 +127,9 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
     }
 
     func test_goBackAction_returnsToPreviousHistoryItem_whenTappedRepeatedly() throws {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: SessionOverlayRequesterSpy())
+        )
         let firstURL = try loadFixture(on: sut, name: "first")
         _ = try loadFixture(on: sut, name: "second")
         sut.handleNavigationFailure(
@@ -138,7 +146,9 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
     }
 
     func test_reopenAction_performsNativeReload_whenTappedRepeatedly() throws {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let sut = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: SessionOverlayRequesterSpy())
+        )
         _ = try loadFixture(on: sut)
         XCTAssertEqual(try navigationType(in: sut), "navigate")
         sut.handleWebContentProcessTermination()
@@ -185,7 +195,7 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
 
     func test_sessionEnd_discardsMountedError_andSuppressesLaterPresentation() {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         let webView = nativeWebView(in: sut)
         sut.handleNavigationFailure(
             .committed(SessionWebNavigationFailureContext(error: navigationError(.timedOut)))
@@ -304,7 +314,7 @@ extension SessionWebRecoveryPresentationTests {
     func test_sameURLReloadFailure_keepsCommittedPage_andEnqueuesActionlessSnackbar() throws {
         let server = try LocalHTTPServer()
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         let pageURL = server.url(path: "/same-url-recovery")
         addTeardownBlock {
             server.stop()
