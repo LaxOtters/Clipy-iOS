@@ -146,22 +146,44 @@ final class LocalHTTPServer: @unchecked Sendable {
     }
 
     private func sendResponse(for request: LocalHTTPRequest, on connection: NWConnection) {
-        let body = Data(responseHTML(for: request).utf8)
+        let response = response(for: request)
         let header = Data((
-            "HTTP/1.1 200 OK\r\n"
-                + "Content-Type: text/html; charset=utf-8\r\n"
-                + "Content-Length: \(body.count)\r\n"
+            "HTTP/1.1 \(response.status)\r\n"
+                + "Content-Type: \(response.contentType)\r\n"
+                + "Content-Length: \(response.body.count)\r\n"
                 + "Connection: close\r\n"
                 + "\r\n"
         ).utf8)
         connection.send(
-            content: header + body,
+            content: header + response.body,
             contentContext: .finalMessage,
             isComplete: true,
             completion: .contentProcessed { _ in
                 connection.cancel()
             }
         )
+    }
+
+    private func response(for request: LocalHTTPRequest) -> LocalHTTPResponse {
+        switch request.path {
+        case "/status/404":
+            return .html(status: "404 Not Found", body: "<html><body>Visible 404</body></html>")
+        case "/status/500":
+            return .html(status: "500 Internal Server Error", body: "<html><body>Visible 500</body></html>")
+        case "/content/image":
+            let svg = """
+            <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8">
+                <rect width="8" height="8" fill="blue"/>
+            </svg>
+            """
+            return LocalHTTPResponse(
+                status: "200 OK",
+                contentType: "image/svg+xml",
+                body: Data(svg.utf8)
+            )
+        default:
+            return .html(status: "200 OK", body: responseHTML(for: request))
+        }
     }
 
     private func responseHTML(for request: LocalHTTPRequest) -> String {
@@ -219,6 +241,20 @@ final class LocalHTTPServer: @unchecked Sendable {
             method: requestParts[0],
             path: requestParts[1],
             body: data.subdata(in: bodyStart..<(bodyStart + contentLength))
+        )
+    }
+}
+
+private struct LocalHTTPResponse {
+    let status: String
+    let contentType: String
+    let body: Data
+
+    static func html(status: String, body: String) -> Self {
+        Self(
+            status: status,
+            contentType: "text/html; charset=utf-8",
+            body: Data(body.utf8)
         )
     }
 }

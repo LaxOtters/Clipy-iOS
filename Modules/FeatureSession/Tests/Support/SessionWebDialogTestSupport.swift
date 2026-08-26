@@ -23,6 +23,7 @@ final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
     private(set) var dialogConfigurations: [ClipyDialog.Configuration] = []
     private(set) var acceptedRequestIDs: [ClipyDialog.RequestID] = []
     private(set) var cancelledRequestIDs: [ClipyDialog.RequestID] = []
+    private(set) var snackbarRequests: [ClipySnackbar.Request] = []
     private var responses: [ClipyDialog.RequestID: @MainActor (ClipyDialog.Response) -> Void] = [:]
     private var deferredResponse: (@MainActor () -> Void)?
 
@@ -59,8 +60,9 @@ final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
         respond(.cancelled(.requestCancelled), to: requestID)
     }
 
-    func enqueueSnackbar(_: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
-        .accepted
+    func enqueueSnackbar(_ request: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
+        snackbarRequests.append(request)
+        return .accepted
     }
 
     func respond(

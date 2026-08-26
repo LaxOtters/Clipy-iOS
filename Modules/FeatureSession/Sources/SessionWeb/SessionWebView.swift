@@ -19,6 +19,8 @@ final class SessionWebView: UIView {
     private let overlayRequester: any ClipyOverlayRequesting
     private var acceptedDialogRequestIDs: Set<ClipyDialog.RequestID> = []
     private var isSessionActive = true
+    private var recoveryHostView: UIView?
+    private var isRecoveryActionClaimed = false
     fileprivate let browserStateRelay = ReplayRelay<SessionBrowserState>.create(bufferSize: 1)
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
@@ -26,6 +28,7 @@ final class SessionWebView: UIView {
     private var observations: [NSKeyValueObservation] = []
     private let rootScrollAdapter = SessionWebRootScrollAdapter()
     private var browserStateProjector = SessionBrowserStateProjector()
+    var onRecoveryGoHome: (() -> Void)?
 
     init(
         frame: CGRect = .zero,
@@ -101,6 +104,33 @@ final class SessionWebView: UIView {
         navigationFinishedRelay.accept(())
     }
 
+    func handleNavigationFailure(_ failure: SessionWebNavigationFailure) {
+        present(
+            SessionWebRecoveryPolicy.presentation(
+                failure: failure,
+                snapshot: recoverySnapshot
+            )
+        )
+    }
+
+    func handleWebContentProcessTermination() {
+        guard isSessionActive else {
+            return
+        }
+
+        present(
+            SessionWebRecoveryPolicy.processTerminationPresentation(snapshot: recoverySnapshot)
+        )
+    }
+
+    func clearRecoveryPresentation() {
+        recoveryHostView?.removeFromSuperview()
+        recoveryHostView = nil
+        isRecoveryActionClaimed = false
+        webView.isUserInteractionEnabled = true
+        webView.accessibilityElementsHidden = false
+    }
+
     func beginRootDragging(snapshot: SessionWebRootScrollSnapshot) {
         emitRootScroll(rootScrollAdapter.beginDragging(snapshot: snapshot))
     }
@@ -129,6 +159,80 @@ final class SessionWebView: UIView {
         rootScrollRelay.accept(input)
     }
 
+    private func present(_ presentation: SessionWebRecoveryPolicy.Presentation) {
+        switch presentation {
+        case .none:
+            return
+        case let .snackbar(message):
+            overlayRequester.enqueueSnackbar(.init(message: message))
+        case let .error(content):
+            showRecoveryContent(content)
+        }
+    }
+
+    private var recoverySnapshot: SessionWebRecoveryPolicy.Snapshot {
+        SessionWebRecoveryPolicy.Snapshot(
+            isSessionActive: isSessionActive,
+            hasMountedErrorContent: recoveryHostView != nil,
+            currentURL: webView.url,
+            currentItemURL: webView.backForwardList.currentItem?.url,
+            canGoBack: webView.canGoBack
+        )
+    }
+
+    private func showRecoveryContent(_ content: SessionWebRecoveryPolicy.ErrorContent) {
+        recoveryHostView?.removeFromSuperview()
+
+        let hostView = UIView()
+        hostView.backgroundColor = .systemBackground
+        hostView.isOpaque = true
+        hostView.translatesAutoresizingMaskIntoConstraints = false
+
+        let contentView = ClipyErrorContentView(
+            title: content.title,
+            body: content.body,
+            action: .init(title: content.actionTitle) { [weak self] in
+                self?.performRecoveryAction(content.action)
+            }
+        )
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        hostView.addSubview(contentView)
+        addSubview(hostView)
+
+        NSLayoutConstraint.activate([
+            hostView.topAnchor.constraint(equalTo: topAnchor),
+            hostView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hostView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            hostView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            contentView.topAnchor.constraint(equalTo: hostView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: hostView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: hostView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: hostView.bottomAnchor)
+        ])
+
+        recoveryHostView = hostView
+        isRecoveryActionClaimed = false
+        webView.isUserInteractionEnabled = false
+        webView.accessibilityElementsHidden = true
+    }
+
+    private func performRecoveryAction(_ action: SessionWebRecoveryPolicy.Action) {
+        guard isSessionActive, !isRecoveryActionClaimed else {
+            return
+        }
+        isRecoveryActionClaimed = true
+
+        switch action {
+        case .reload, .reopenPage:
+            reload()
+        case .goBack:
+            goBack()
+        case .goHome:
+            endSession()
+            onRecoveryGoHome?()
+        }
+    }
+
     func scrollSnapshot(from scrollView: UIScrollView) -> SessionWebRootScrollSnapshot {
         SessionWebRootScrollSnapshot(
             offsetY: scrollView.contentOffset.y,
@@ -150,6 +254,7 @@ extension SessionWebView {
         }
 
         isSessionActive = false
+        clearRecoveryPresentation()
         let requestIDs = acceptedDialogRequestIDs
         acceptedDialogRequestIDs.removeAll()
         requestIDs.forEach(overlayRequester.cancelDialog)
@@ -223,7 +328,7 @@ extension SessionWebView {
     }
 
     func reload() {
-        guard webView.url != nil else {
+        guard webView.url != nil || webView.backForwardList.currentItem != nil else {
             return
         }
 

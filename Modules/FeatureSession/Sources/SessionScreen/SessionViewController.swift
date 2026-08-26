@@ -37,6 +37,9 @@ final class SessionViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        rootView.onWebRecoveryGoHome = { [weak self] in
+            self?.handle(route: .home)
+        }
         bindViewModel()
     }
 

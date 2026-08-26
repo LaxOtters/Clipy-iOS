@@ -146,6 +146,11 @@ final class SessionView: UIView {
 // MARK: - Interface
 
 extension SessionView {
+    var onWebRecoveryGoHome: (() -> Void)? {
+        get { browserView.onRecoveryGoHome }
+        set { browserView.onRecoveryGoHome = newValue }
+    }
+
     func endSession() {
         browserView.endSession()
     }
