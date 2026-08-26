@@ -118,9 +118,20 @@ final class SessionWebView: UIView {
             return
         }
 
+        cancelAcceptedDialogs()
+        guard isSessionActive else {
+            return
+        }
+
         present(
             SessionWebRecoveryPolicy.processTerminationPresentation(snapshot: recoverySnapshot)
         )
+    }
+
+    private func cancelAcceptedDialogs() {
+        let requestIDs = acceptedDialogRequestIDs
+        acceptedDialogRequestIDs.removeAll()
+        requestIDs.forEach(overlayRequester.cancelDialog)
     }
 
     func clearRecoveryPresentation() {
@@ -255,9 +266,7 @@ extension SessionWebView {
 
         isSessionActive = false
         clearRecoveryPresentation()
-        let requestIDs = acceptedDialogRequestIDs
-        acceptedDialogRequestIDs.removeAll()
-        requestIDs.forEach(overlayRequester.cancelDialog)
+        cancelAcceptedDialogs()
     }
 
     func presentJavaScriptDialog(
