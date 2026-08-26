@@ -19,6 +19,10 @@ struct SessionWebNavigationFailureContext: Equatable {
     let code: Int
     let message: String
 
+    var error: NSError {
+        NSError(domain: domain, code: code)
+    }
+
     init(error: Error) {
         let error = error as NSError
         domain = error.domain

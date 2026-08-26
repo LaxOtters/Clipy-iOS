@@ -10,6 +10,7 @@ import WebKit
 extension SessionWebView: WKNavigationDelegate {
     // 페이지 이동 완료를 기존 Session chrome 복원 입력으로 전달합니다.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        clearRecoveryPresentation()
         emitNavigationFinished()
     }
 
@@ -18,9 +19,11 @@ extension SessionWebView: WKNavigationDelegate {
         didFail navigation: WKNavigation!,
         withError error: Error
     ) {
-        emitNavigationFailure(
-            .committed(SessionWebNavigationFailureContext(error: error))
+        let failure = SessionWebNavigationFailure.committed(
+            SessionWebNavigationFailureContext(error: error)
         )
+        emitNavigationFailure(failure)
+        handleNavigationFailure(failure)
     }
 
     func webView(
@@ -28,8 +31,14 @@ extension SessionWebView: WKNavigationDelegate {
         didFailProvisionalNavigation navigation: WKNavigation!,
         withError error: Error
     ) {
-        emitNavigationFailure(
-            .provisional(SessionWebNavigationFailureContext(error: error))
+        let failure = SessionWebNavigationFailure.provisional(
+            SessionWebNavigationFailureContext(error: error)
         )
+        emitNavigationFailure(failure)
+        handleNavigationFailure(failure)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        handleWebContentProcessTermination()
     }
 }
