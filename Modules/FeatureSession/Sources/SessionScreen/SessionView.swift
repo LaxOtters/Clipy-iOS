@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+import CoreDesignSystem
 import RxCocoa
 import RxSwift
 
@@ -15,7 +16,7 @@ import RxSwift
 /// 사용자의 입력을 밖으로 열고, 내려온 chrome state는 그대로 화면에 그립니다.
 final class SessionView: UIView {
     fileprivate let topBarView = SessionTopBarView()
-    fileprivate let browserView = SessionWebView()
+    fileprivate let browserView: SessionWebView
     fileprivate let bottomSheetView = SessionBottomSheetView()
     private var topBarFoldedConstraints: [NSLayoutConstraint] = []
     private var topBarUnfoldedConstraints: [NSLayoutConstraint] = []
@@ -24,8 +25,9 @@ final class SessionView: UIView {
     private var renderedBottomSheetState = SessionChromeState.newSession.bottomSheetState
     private var isTrackingDockedKeyboard = false
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(overlayRequester: any ClipyOverlayRequesting) {
+        browserView = SessionWebView(overlayRequester: overlayRequester)
+        super.init(frame: .zero)
         configureHierarchy()
         configureStyle()
         configureLayout()
@@ -144,6 +146,10 @@ final class SessionView: UIView {
 // MARK: - Interface
 
 extension SessionView {
+    func endSession() {
+        browserView.endSession()
+    }
+
     func load(url: URL) {
         browserView.load(url: url)
     }

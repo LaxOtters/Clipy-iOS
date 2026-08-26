@@ -27,7 +27,7 @@ final class SessionWebViewNavigationTests: XCTestCase {
     }
 
     func test_navigationDelegate_preservesCommittedAndProvisionalFailureKinds() {
-        let sut = SessionWebView()
+        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
         let committedError = NSError(domain: "committed", code: 41)
         let provisionalError = NSError(domain: "provisional", code: 42)
         var failures: [SessionWebNavigationFailure] = []
@@ -244,7 +244,10 @@ private enum StepFailure: Error {
 }
 
 private final class SessionWebViewHistoryHarness {
-    let webView = SessionWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760))
+    let webView = SessionWebView(
+        frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+        overlayRequester: SessionOverlayRequesterSpy()
+    )
     let firstName = "first-\(UUID().uuidString)"
     let secondName = "second-\(UUID().uuidString)"
     let firstURL: URL

@@ -17,7 +17,10 @@ enum NewWindowNavigationTestError: Error {
 }
 
 final class SessionWebViewNewWindowHarness {
-    let sessionWebView = SessionWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 760))
+    let sessionWebView = SessionWebView(
+        frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+        overlayRequester: SessionOverlayRequesterSpy()
+    )
 
     var mainWebView: WKWebView {
         get throws {

@@ -34,9 +34,26 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         let window = UIWindow(windowScene: windowScene)
         let navigationController = AppMainNavigationController()
-        let homeComposer = AppMainHomeComposer { [weak navigationController] context in
-            let sessionViewController = SessionFeature.makeViewController(context: context)
-            navigationController?.pushViewController(sessionViewController, animated: true)
+        let overlayContainerViewController = AppOverlayContainerViewController(
+            contentViewController: navigationController
+        )
+        let overlayCoordinator = AppOverlayCoordinator(
+            host: overlayContainerViewController,
+            isSceneActive: windowScene.activationState == .foregroundActive
+        )
+        overlayContainerViewController.setHostDetachHandler { [weak overlayCoordinator] in
+            overlayCoordinator?.hostDidDetach()
+        }
+        let homeComposer = AppMainHomeComposer { [weak navigationController, weak overlayCoordinator] context in
+            guard let navigationController, let overlayCoordinator else {
+                return
+            }
+
+            let sessionViewController = SessionFeature.makeViewController(
+                context: context,
+                overlayRequester: overlayCoordinator
+            )
+            navigationController.pushViewController(sessionViewController, animated: true)
         }
         let homeViewController = homeComposer.makeViewController()
 
@@ -52,18 +69,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
 
         navigationController.setNavigationBarHidden(true, animated: false)
-        let overlayContainerViewController = AppOverlayContainerViewController(
-            contentViewController: navigationController
-        )
         window.rootViewController = overlayContainerViewController
         window.makeKeyAndVisible()
-        let overlayCoordinator = AppOverlayCoordinator(
-            host: overlayContainerViewController,
-            isSceneActive: windowScene.activationState == .foregroundActive
-        )
-        overlayContainerViewController.setHostDetachHandler { [weak overlayCoordinator] in
-            overlayCoordinator?.hostDidDetach()
-        }
         self.window = window
         self.homeViewController = homeViewController
         self.navigationController = navigationController
