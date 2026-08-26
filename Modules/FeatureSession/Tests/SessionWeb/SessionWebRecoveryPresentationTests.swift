@@ -20,8 +20,7 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
         let overlay = SessionOverlayRequesterSpy()
         let sut = SessionWebView(overlayRequester: overlay)
         let currentURL = try loadFixture(on: sut)
-        let failingURL = try XCTUnwrap(URL(string: "https://example.com/failed"))
-        let error = navigationError(.cannotConnectToHost, failingURL: failingURL)
+        let error = navigationError(.cannotConnectToHost)
 
         sut.handleNavigationFailure(
             .provisional(SessionWebNavigationFailureContext(error: error))
@@ -196,10 +195,7 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
         sut.handleNavigationFailure(
             .provisional(
                 SessionWebNavigationFailureContext(
-                    error: navigationError(
-                        .cannotConnectToHost,
-                        failingURL: URL(string: "https://example.com/failed")
-                    )
+                    error: navigationError(.cannotConnectToHost)
                 )
             )
         )
@@ -211,13 +207,8 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
         XCTAssertFalse(webView?.accessibilityElementsHidden ?? true)
     }
 
-    private func navigationError(
-        _ code: URLError.Code,
-        failingURL: URL? = nil
-    ) -> NSError {
-        var userInfo: [String: Any] = [:]
-        userInfo[NSURLErrorFailingURLErrorKey] = failingURL
-        return NSError(domain: NSURLErrorDomain, code: code.rawValue, userInfo: userInfo)
+    private func navigationError(_ code: URLError.Code) -> NSError {
+        NSError(domain: NSURLErrorDomain, code: code.rawValue)
     }
 
     private func loadFixture(on sut: SessionWebView, name: String = "recovery") throws -> URL {
@@ -306,6 +297,43 @@ final class SessionWebRecoveryPresentationTests: XCTestCase {
 
     private func descendants(of view: UIView) -> [UIView] {
         view.subviews + view.subviews.flatMap { descendants(of: $0) }
+    }
+}
+
+extension SessionWebRecoveryPresentationTests {
+    func test_sameURLReloadFailure_keepsCommittedPage_andEnqueuesActionlessSnackbar() throws {
+        let server = try LocalHTTPServer()
+        let overlay = SessionOverlayRequesterSpy()
+        let sut = SessionWebView(overlayRequester: overlay)
+        let pageURL = server.url(path: "/same-url-recovery")
+        addTeardownBlock {
+            server.stop()
+        }
+
+        try waitForNavigationFinish(on: sut, step: "load same-URL recovery fixture") {
+            sut.load(url: pageURL)
+        }
+        server.stop()
+
+        let failed = expectation(description: "same-URL reload fails provisionally")
+        let disposable = sut.rx.navigationFailure
+            .asObservable()
+            .take(1)
+            .subscribe(onNext: { failure in
+                guard case .provisional = failure else {
+                    return XCTFail("Expected provisional reload failure, got \(failure).")
+                }
+                failed.fulfill()
+            })
+
+        sut.reload()
+        XCTAssertEqual(XCTWaiter.wait(for: [failed], timeout: 10), .completed)
+        disposable.dispose()
+
+        XCTAssertEqual(sut.currentURL, pageURL)
+        XCTAssertEqual(overlay.snackbarRequests.map(\.message), ["Couldn't load this page"])
+        XCTAssertNil(overlay.snackbarRequests.first?.action)
+        XCTAssertNil(errorContent(in: sut))
     }
 }
 

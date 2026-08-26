@@ -58,8 +58,7 @@ final class SessionWebRecoveryPolicyTests: XCTestCase {
 
     func test_presentation_usesInactiveCancelledMountedAndUsablePagePrecedence() throws {
         let currentURL = try XCTUnwrap(URL(string: "https://example.com/current"))
-        let failingURL = try XCTUnwrap(URL(string: "https://example.com/failed"))
-        let failure = provisionalFailure(code: .cannotConnectToHost, failingURL: failingURL)
+        let failure = provisionalFailure(code: .cannotConnectToHost)
 
         XCTAssertEqual(
             presentation(
@@ -73,7 +72,7 @@ final class SessionWebRecoveryPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             presentation(
-                provisionalFailure(code: .cancelled, failingURL: failingURL),
+                provisionalFailure(code: .cancelled),
                 hasMountedErrorContent: true,
                 currentURL: currentURL,
                 currentItemURL: currentURL
@@ -92,7 +91,7 @@ final class SessionWebRecoveryPolicyTests: XCTestCase {
 
         XCTAssertEqual(
             presentation(
-                provisionalFailure(code: .serverCertificateUntrusted, failingURL: failingURL),
+                provisionalFailure(code: .serverCertificateUntrusted),
                 hasMountedErrorContent: false,
                 currentURL: currentURL,
                 currentItemURL: currentURL
@@ -141,7 +140,7 @@ final class SessionWebRecoveryPolicyTests: XCTestCase {
     }
 
     func test_certificateFailure_withoutUsablePage_offersBackOrHomeOnly() {
-        let failure = provisionalFailure(code: .serverCertificateUntrusted, failingURL: nil)
+        let failure = provisionalFailure(code: .serverCertificateUntrusted)
 
         let back = errorContent(from: presentation(failure, canGoBack: true))
         XCTAssertEqual(back.title, "This connection isn’t secure")
@@ -266,13 +265,23 @@ final class SessionWebRecoveryPolicyTests: XCTestCase {
         )
     }
 
-    private func provisionalFailure(
-        code: URLError.Code,
-        failingURL: URL?
-    ) -> SessionWebNavigationFailure {
-        var userInfo: [String: Any] = [:]
-        userInfo[NSURLErrorFailingURLErrorKey] = failingURL
-        let error = NSError(domain: NSURLErrorDomain, code: code.rawValue, userInfo: userInfo)
+    private func provisionalFailure(code: URLError.Code) -> SessionWebNavigationFailure {
+        let error = NSError(domain: NSURLErrorDomain, code: code.rawValue)
         return .provisional(SessionWebNavigationFailureContext(error: error))
+    }
+}
+
+extension SessionWebRecoveryPolicyTests {
+    func test_provisionalFailure_withCurrentItem_enqueuesSnackbar_withoutFailedTargetInput() {
+        let currentURL = URL(string: "https://example.com/current")
+
+        XCTAssertEqual(
+            presentation(
+                provisionalFailure(code: .cannotConnectToHost),
+                currentURL: currentURL,
+                currentItemURL: currentURL
+            ),
+            .snackbar("Couldn't load this page")
+        )
     }
 }

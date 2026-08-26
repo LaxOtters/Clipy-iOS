@@ -18,7 +18,6 @@ struct SessionWebNavigationFailureContext: Equatable {
     let domain: String
     let code: Int
     let message: String
-    let failingURL: URL?
 
     var error: NSError {
         NSError(domain: domain, code: code)
@@ -29,6 +28,5 @@ struct SessionWebNavigationFailureContext: Equatable {
         domain = error.domain
         code = error.code
         message = error.localizedDescription
-        failingURL = error.userInfo[NSURLErrorFailingURLErrorKey] as? URL
     }
 }

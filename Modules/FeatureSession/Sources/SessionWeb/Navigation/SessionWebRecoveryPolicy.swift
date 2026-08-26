@@ -125,10 +125,7 @@ enum SessionWebRecoveryPolicy {
             )
         }
 
-        if isProvisional,
-           let failingURL = context.failingURL,
-           let currentItemURL = snapshot.currentItemURL,
-           currentItemURL != failingURL {
+        if isProvisional, snapshot.currentItemURL != nil {
             return .snackbar("Couldn't load this page")
         }
 
