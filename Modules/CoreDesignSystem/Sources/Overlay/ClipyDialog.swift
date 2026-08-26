@@ -9,6 +9,15 @@ import Foundation
 
 /// Dialog를 요청하고 응답을 받을 때 쓰는 public 타입을 묶습니다.
 public enum ClipyDialog {
+    /// 수락된 Dialog 요청을 나중에 같은 coordinator에 전달해 취소할 때 쓰는 식별자입니다.
+    public struct RequestID: Hashable {
+        private let rawValue: UUID
+
+        public init() {
+            rawValue = UUID()
+        }
+    }
+
     public enum SemanticIcon: Equatable {
         case error
     }
@@ -60,6 +69,7 @@ public enum ClipyDialog {
         case hostUnavailable
         case displayFailed
         case sceneDisconnected
+        case requestCancelled
     }
 
     /// 수락된 Dialog가 선택이나 cancellation으로 끝났을 때 한 번만 전달됩니다.
@@ -81,7 +91,7 @@ public enum ClipyDialog {
     /// Dialog 요청을 지금 맡았는지 바로 알려줍니다.
     /// `accepted` 뒤 실제 종료 결과는 response callback으로 옵니다.
     public enum RequestResult: Equatable {
-        case accepted
+        case accepted(RequestID)
         case rejected(RequestRejection)
     }
 }

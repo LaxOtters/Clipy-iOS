@@ -8,6 +8,7 @@
 import UIKit
 import WebKit
 
+import CoreDesignSystem
 import RxCocoa
 import RxRelay
 import RxSwift
@@ -15,6 +16,9 @@ import RxSwift
 /// 세션 화면에서 사용하는 WKWebView를 감싸고 브라우저 입력과 화면 표시값을 연결합니다.
 final class SessionWebView: UIView {
     private let webView: WKWebView
+    private let overlayRequester: any ClipyOverlayRequesting
+    private var acceptedDialogRequestIDs: Set<ClipyDialog.RequestID> = []
+    private var isSessionActive = true
     fileprivate let browserStateRelay = ReplayRelay<SessionBrowserState>.create(bufferSize: 1)
     fileprivate let navigationFailureRelay = PublishRelay<SessionWebNavigationFailure>()
     fileprivate let rootScrollRelay = PublishRelay<SessionWebRootScrollInput>()
@@ -23,8 +27,12 @@ final class SessionWebView: UIView {
     private let rootScrollAdapter = SessionWebRootScrollAdapter()
     private var browserStateProjector = SessionBrowserStateProjector()
 
-    override init(frame: CGRect) {
+    init(
+        frame: CGRect = .zero,
+        overlayRequester: any ClipyOverlayRequesting
+    ) {
         webView = WKWebView(frame: .zero)
+        self.overlayRequester = overlayRequester
         super.init(frame: frame)
         configureView()
         observeBrowserStateChanges()
@@ -136,6 +144,54 @@ final class SessionWebView: UIView {
 // MARK: - Interface
 
 extension SessionWebView {
+    func endSession() {
+        guard isSessionActive else {
+            return
+        }
+
+        isSessionActive = false
+        let requestIDs = acceptedDialogRequestIDs
+        acceptedDialogRequestIDs.removeAll()
+        requestIDs.forEach(overlayRequester.cancelDialog)
+    }
+
+    func presentJavaScriptDialog(
+        _ configuration: ClipyDialog.Configuration,
+        onResponse: @escaping @MainActor (ClipyDialog.Response) -> Void,
+        onUnavailable: @escaping @MainActor () -> Void
+    ) {
+        guard isSessionActive else {
+            onUnavailable()
+            return
+        }
+
+        var acceptedRequestID: ClipyDialog.RequestID?
+        var didReceiveResponse = false
+        let result = overlayRequester.presentDialog(configuration) { [weak self] response in
+            didReceiveResponse = true
+            if let acceptedRequestID {
+                self?.acceptedDialogRequestIDs.remove(acceptedRequestID)
+            }
+            onResponse(response)
+        }
+
+        switch result {
+        case let .accepted(requestID):
+            acceptedRequestID = requestID
+            guard !didReceiveResponse else {
+                return
+            }
+            guard isSessionActive else {
+                overlayRequester.cancelDialog(requestID)
+                return
+            }
+            acceptedDialogRequestIDs.insert(requestID)
+
+        case .rejected:
+            onUnavailable()
+        }
+    }
+
     var currentURL: URL? {
         webView.url
     }

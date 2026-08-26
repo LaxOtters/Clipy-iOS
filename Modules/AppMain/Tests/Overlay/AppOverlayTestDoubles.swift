@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import XCTest
 
 import CoreDesignSystem
 @testable import AppMain
@@ -17,6 +18,34 @@ let overlayDialogConfiguration = ClipyDialog.Configuration.message(
     body: "Body",
     buttons: .single(title: "OK")
 )
+
+@MainActor
+func assertDialogRequestAccepted(
+    _ result: ClipyDialog.RequestResult,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    guard case .accepted = result else {
+        return XCTFail("Expected an accepted Dialog request.", file: file, line: line)
+    }
+}
+
+@MainActor
+func acceptedDialogRequestID(
+    _ result: ClipyDialog.RequestResult,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws -> ClipyDialog.RequestID {
+    guard case let .accepted(requestID) = result else {
+        XCTFail("Expected an accepted Dialog request.", file: file, line: line)
+        throw DialogRequestAssertionError.notAccepted
+    }
+    return requestID
+}
+
+private enum DialogRequestAssertionError: Error {
+    case notAccepted
+}
 
 @MainActor
 func makeOverlayCoordinator(

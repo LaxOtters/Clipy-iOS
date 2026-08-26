@@ -7,17 +7,22 @@
 
 import UIKit
 
+import CoreDesignSystem
 import RxCocoa
 import RxSwift
 
 final class SessionViewController: UIViewController {
-    private let rootView = SessionView()
+    private let rootView: SessionView
     private let viewModel: SessionViewModel
     private let disposeBag = DisposeBag()
     private var previousPopGestureEnabled: Bool?
 
-    init(viewModel: SessionViewModel) {
+    init(
+        viewModel: SessionViewModel,
+        overlayRequester: any ClipyOverlayRequesting
+    ) {
         self.viewModel = viewModel
+        rootView = SessionView(overlayRequester: overlayRequester)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -48,6 +53,18 @@ final class SessionViewController: UIViewController {
             navigationController?.interactivePopGestureRecognizer?.isEnabled = previousPopGestureEnabled
         }
         super.viewWillDisappear(animated)
+    }
+
+    override func didMove(toParent parent: UIViewController?) {
+        super.didMove(toParent: parent)
+
+        if parent == nil {
+            rootView.endSession()
+        }
+    }
+
+    deinit {
+        rootView.endSession()
     }
 
     private func bindViewModel() {

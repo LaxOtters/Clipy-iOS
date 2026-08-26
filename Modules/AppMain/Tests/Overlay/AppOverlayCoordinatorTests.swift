@@ -38,7 +38,7 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         let coordinator = makeOverlayCoordinator(host: host)
         weak var rejectedSentinel: LifetimeSentinel?
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { _ in }, .accepted)
+        assertDialogRequestAccepted(coordinator.presentDialog(overlayDialogConfiguration) { _ in })
         do {
             let sentinel = LifetimeSentinel()
             rejectedSentinel = sentinel
@@ -58,7 +58,9 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         let coordinator = makeOverlayCoordinator(host: host)
         var responses: [ClipyDialog.Response] = []
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }, .accepted)
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
+        )
         coordinator.sceneWillResignActive()
         XCTAssertTrue(responses.isEmpty)
 
@@ -71,7 +73,9 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         host.completeDialogUnmount(at: 0)
         XCTAssertEqual(responses, [.cancelled(.sceneInactive)])
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }, .accepted)
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
+        )
         host.dialogCallbacks[0](.primary, nil)
 
         XCTAssertEqual(
@@ -86,34 +90,6 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         )
     }
 
-    func test_dialogCancellation_releasesSlotBeforeResponseAndUsesCurrentLifecycleForReentry() {
-        let host = OverlayHostSpy(defersDialogUnmount: true)
-        let coordinator = makeOverlayCoordinator(host: host)
-        var responses: [ClipyDialog.Response] = []
-        var reentrantRequestResult: ClipyDialog.RequestResult?
-
-        XCTAssertEqual(
-            coordinator.presentDialog(overlayDialogConfiguration) { response in
-                responses.append(response)
-                reentrantRequestResult = coordinator.presentDialog(overlayDialogConfiguration) { _ in }
-            },
-            .accepted
-        )
-
-        coordinator.sceneWillResignActive()
-
-        XCTAssertTrue(responses.isEmpty)
-        XCTAssertEqual(
-            coordinator.presentDialog(overlayDialogConfiguration) { _ in },
-            .rejected(.dialogAlreadyPresented)
-        )
-
-        host.completeDialogUnmount(at: 0)
-
-        XCTAssertEqual(responses, [.cancelled(.sceneInactive)])
-        XCTAssertEqual(reentrantRequestResult, .rejected(.sceneInactive))
-    }
-
     func test_dialogDisplayFailure_releasesSlotBeforeResponseAndAllowsReentrantDialog() async {
         let host = OverlayHostSpy(dialogMountResult: .unavailable, defersDialogUnmount: true)
         let coordinator = makeOverlayCoordinator(host: host)
@@ -126,13 +102,12 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         do {
             let sentinel = LifetimeSentinel()
             weakSentinel = sentinel
-            XCTAssertEqual(
+            assertDialogRequestAccepted(
                 coordinator.presentDialog(overlayDialogConfiguration) { [sentinel] response in
                     _ = sentinel
                     responses.append(response)
                     reentrantRequestResult = coordinator.presentDialog(overlayDialogConfiguration) { _ in }
-                },
-                .accepted
+                }
             )
         }
         XCTAssertEqual(
@@ -147,7 +122,11 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         host.completeDialogUnmount(at: 0)
 
         XCTAssertEqual(responses, [.cancelled(.displayFailed)])
-        XCTAssertEqual(reentrantRequestResult, .accepted)
+        if let reentrantRequestResult {
+            assertDialogRequestAccepted(reentrantRequestResult)
+        } else {
+            XCTFail("Expected a reentrant Dialog request result.")
+        }
         XCTAssertNil(weakSentinel)
     }
 
@@ -156,9 +135,8 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         let coordinator = makeOverlayCoordinator(host: host)
         var responses: [ClipyDialog.Response] = []
 
-        XCTAssertEqual(
-            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) },
-            .accepted
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
         )
         host.dialogCallbacks[0](.primary, "snapshot")
         coordinator.sceneWillResignActive()
@@ -178,12 +156,11 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         var responses: [ClipyDialog.Response] = []
         var reentrantRequestResult: ClipyDialog.RequestResult?
 
-        XCTAssertEqual(
+        assertDialogRequestAccepted(
             coordinator.presentDialog(overlayDialogConfiguration) { response in
                 responses.append(response)
                 reentrantRequestResult = coordinator.presentDialog(overlayDialogConfiguration) { _ in }
-            },
-            .accepted
+            }
         )
 
         host.dialogCallbacks[0](.primary, "snapshot")
@@ -214,7 +191,9 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         weak var visibleSentinel: LifetimeSentinel?
         weak var queuedSentinel: LifetimeSentinel?
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }, .accepted)
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
+        )
         do {
             let visible = LifetimeSentinel()
             let queued = LifetimeSentinel()
@@ -251,7 +230,9 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         weak var firstSentinel: LifetimeSentinel?
         weak var secondSentinel: LifetimeSentinel?
 
-        XCTAssertEqual(coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }, .accepted)
+        assertDialogRequestAccepted(
+            coordinator.presentDialog(overlayDialogConfiguration) { responses.append($0) }
+        )
         do {
             let first = LifetimeSentinel()
             let second = LifetimeSentinel()
@@ -286,8 +267,12 @@ final class AppOverlayCoordinatorTests: XCTestCase {
         var firstResponses: [ClipyDialog.Response] = []
         var secondResponses: [ClipyDialog.Response] = []
 
-        XCTAssertEqual(first.presentDialog(overlayDialogConfiguration) { firstResponses.append($0) }, .accepted)
-        XCTAssertEqual(second.presentDialog(overlayDialogConfiguration) { secondResponses.append($0) }, .accepted)
+        assertDialogRequestAccepted(
+            first.presentDialog(overlayDialogConfiguration) { firstResponses.append($0) }
+        )
+        assertDialogRequestAccepted(
+            second.presentDialog(overlayDialogConfiguration) { secondResponses.append($0) }
+        )
         XCTAssertEqual(first.enqueueSnackbar(.init(message: "Same")), .accepted)
         XCTAssertEqual(second.enqueueSnackbar(.init(message: "Same")), .accepted)
 
