@@ -23,6 +23,7 @@ extension SessionWebView: WKNavigationDelegate {
             SessionWebNavigationFailureContext(error: error)
         )
         emitNavigationFailure(failure)
+        guard !isWebKitPolicyInterruption(error) else { return }
         handleNavigationFailure(failure)
     }
 
@@ -35,6 +36,7 @@ extension SessionWebView: WKNavigationDelegate {
             SessionWebNavigationFailureContext(error: error)
         )
         emitNavigationFailure(failure)
+        guard !isWebKitPolicyInterruption(error) else { return }
         handleNavigationFailure(failure)
     }
 
@@ -99,4 +101,10 @@ extension SessionWebView: WKNavigationDelegate {
             showUnsupportedDownloadMessage()
         }
     }
+}
+
+// WebKit의 policy 취소 실패값은 공개 contract가 아니므로 delegate 경계 밖으로 분류를 넘기지 않습니다.
+private func isWebKitPolicyInterruption(_ error: Error) -> Bool {
+    let error = error as NSError
+    return error.domain == "WebKitErrorDomain" && error.code == 102
 }

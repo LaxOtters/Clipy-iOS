@@ -50,6 +50,45 @@ final class SessionWebViewNavigationTests: XCTestCase {
         )
     }
 
+    func test_policyInterruption_emitsFailure_withoutRecovery_andAdjacentErrorUsesRecovery() throws {
+        let harness = try makeHistoryHarness()
+        try load(harness.firstURL, on: harness.webView, step: "load recovery fixture")
+        let policyInterruption = NSError(domain: "WebKitErrorDomain", code: 102)
+        let adjacentError = NSError(domain: "WebKitErrorDomain", code: 103)
+        var failures: [SessionWebNavigationFailure] = []
+
+        harness.webView.rx.navigationFailure
+            .emit(onNext: { failures.append($0) })
+            .disposed(by: disposeBag)
+
+        harness.webView.webView(
+            WKWebView(),
+            didFailProvisionalNavigation: nil,
+            withError: policyInterruption
+        )
+
+        XCTAssertEqual(
+            failures,
+            [.provisional(SessionWebNavigationFailureContext(error: policyInterruption))]
+        )
+        XCTAssertTrue(harness.snackbarMessages.isEmpty)
+
+        harness.webView.webView(
+            WKWebView(),
+            didFailProvisionalNavigation: nil,
+            withError: adjacentError
+        )
+
+        XCTAssertEqual(
+            failures,
+            [
+                .provisional(SessionWebNavigationFailureContext(error: policyInterruption)),
+                .provisional(SessionWebNavigationFailureContext(error: adjacentError))
+            ]
+        )
+        XCTAssertEqual(harness.snackbarMessages, ["Couldn't load this page"])
+    }
+
     func test_load_emitsEffectiveURLProjection_beforeRealNavigationFinishes() throws {
         let harness = try makeHistoryHarness()
         var states: [SessionBrowserState] = []
@@ -256,6 +295,7 @@ private final class SessionWebViewHistoryHarness {
 
     var firstDisplayText: String { firstURL.absoluteString }
     var secondDisplayText: String { secondURL.absoluteString }
+    var snackbarMessages: [String] { overlay.snackbarRequests.map(\.message) }
 
     private let window: UIWindow
     private let fixtureDirectory: URL
