@@ -16,11 +16,11 @@ enum NewWindowNavigationTestError: Error {
     case timedOut
 }
 
+@MainActor
 final class SessionWebViewNewWindowHarness {
-    let sessionWebView = SessionWebView(
-        frame: CGRect(x: 0, y: 0, width: 390, height: 760),
-        overlayRequester: SessionOverlayRequesterSpy()
-    )
+    let overlay: SessionOverlayRequesterSpy
+    let opener: SessionURLOpenerSpy
+    let sessionWebView: SessionWebView
 
     var mainWebView: WKWebView {
         get throws {
@@ -35,15 +35,20 @@ final class SessionWebViewNewWindowHarness {
     private var isTornDown = false
 
     init() {
+        let overlay = SessionOverlayRequesterSpy()
+        let opener = SessionURLOpenerSpy()
+        let sessionWebView = SessionWebView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+            dependencies: makeSessionDependencies(overlay: overlay, opener: opener)
+        )
+        self.overlay = overlay
+        self.opener = opener
+        self.sessionWebView = sessionWebView
         window = UIWindow(frame: sessionWebView.bounds)
         let viewController = UIViewController()
         viewController.view.addSubview(sessionWebView)
         window.rootViewController = viewController
         window.isHidden = false
-    }
-
-    deinit {
-        tearDown()
     }
 
     func tearDown() {
@@ -66,6 +71,7 @@ final class LocalHTTPServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "clipy.session-web-new-window-http-server")
     private let receiptLock = NSLock()
     private var storedReceipts: [LocalHTTPRequest] = []
+    private var receiptObserver: (@Sendable (LocalHTTPRequest) -> Void)?
     private(set) var port: UInt16 = 0
 
     var receipts: [LocalHTTPRequest] {
@@ -111,6 +117,12 @@ final class LocalHTTPServer: @unchecked Sendable {
         listener.cancel()
     }
 
+    func observeReceipts(_ observer: @escaping @Sendable (LocalHTTPRequest) -> Void) {
+        receiptLock.withLock {
+            receiptObserver = observer
+        }
+    }
+
     private func accept(_ connection: NWConnection) {
         connection.start(queue: queue)
         receiveRequest(on: connection, accumulatedData: Data())
@@ -129,9 +141,11 @@ final class LocalHTTPServer: @unchecked Sendable {
             }
 
             if let request = Self.parseRequest(from: requestData) {
-                receiptLock.withLock {
+                let observer = receiptLock.withLock {
                     self.storedReceipts.append(request)
+                    return self.receiptObserver
                 }
+                observer?(request)
                 sendResponse(for: request, on: connection)
                 return
             }
@@ -147,9 +161,13 @@ final class LocalHTTPServer: @unchecked Sendable {
 
     private func sendResponse(for request: LocalHTTPRequest, on connection: NWConnection) {
         let response = response(for: request)
+        let additionalHeaders = response.additionalHeaders
+            .map { "\($0.name): \($0.value)\r\n" }
+            .joined()
         let header = Data((
             "HTTP/1.1 \(response.status)\r\n"
                 + "Content-Type: \(response.contentType)\r\n"
+                + additionalHeaders
                 + "Content-Length: \(response.body.count)\r\n"
                 + "Connection: close\r\n"
                 + "\r\n"
@@ -181,6 +199,24 @@ final class LocalHTTPServer: @unchecked Sendable {
                 contentType: "image/svg+xml",
                 body: Data(svg.utf8)
             )
+        case "/unsupported-download", "/unsupported-post":
+            return LocalHTTPResponse(
+                status: "200 OK",
+                contentType: "application/octet-stream",
+                body: Data([0x00, 0x01, 0x02, 0x03]),
+                additionalHeaders: [
+                    .init(name: "Content-Disposition", value: "attachment; filename=fixture.bin")
+                ]
+            )
+        case "/displayable-attachment":
+            return LocalHTTPResponse(
+                status: "200 OK",
+                contentType: "text/html; charset=utf-8",
+                body: Data("<html><body>attachment</body></html>".utf8),
+                additionalHeaders: [
+                    .init(name: "content-disposition", value: "Attachment; filename=fixture.html")
+                ]
+            )
         default:
             return .html(status: "200 OK", body: responseHTML(for: request))
         }
@@ -198,6 +234,24 @@ final class LocalHTTPServer: @unchecked Sendable {
             return """
             <html><body>
                 <form id="post-form" action="\(url(path: "/post-destination"))" method="post" target="_blank">
+                    <input name="item" value="clipy">
+                    <input name="count" value="1">
+                </form>
+            </body></html>
+            """
+        case "/download-start":
+            return """
+            <html><body>
+                <a id="download-link"
+                   href="\(url(path: "/download-destination"))"
+                   target="_blank"
+                   download="fixture.bin">download</a>
+            </body></html>
+            """
+        case "/unsupported-post-start":
+            return """
+            <html><body>
+                <form id="unsupported-post-form" action="\(url(path: "/unsupported-post"))" method="post">
                     <input name="item" value="clipy">
                     <input name="count" value="1">
                 </form>
@@ -246,9 +300,27 @@ final class LocalHTTPServer: @unchecked Sendable {
 }
 
 private struct LocalHTTPResponse {
+    struct Header {
+        let name: String
+        let value: String
+    }
+
     let status: String
     let contentType: String
     let body: Data
+    let additionalHeaders: [Header]
+
+    init(
+        status: String,
+        contentType: String,
+        body: Data,
+        additionalHeaders: [Header] = []
+    ) {
+        self.status = status
+        self.contentType = contentType
+        self.body = body
+        self.additionalHeaders = additionalHeaders
+    }
 
     static func html(status: String, body: String) -> Self {
         Self(

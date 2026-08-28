@@ -14,11 +14,11 @@ import CoreDesignSystem
 final class SessionWebDialogRequestLifetimeTests: XCTestCase {
     func test_processTermination_cancelsAcceptedDialogsBeforeMountingRecovery_exactlyOnce() throws {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var completionCount = 0
         var recoveryWasMountedDuringCancellation = false
 
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Pending", sourceURL: nil),
             onResponse: { _ in completionCount += 1 },
             onUnavailable: { XCTFail("Expected accepted request") }
@@ -41,9 +41,9 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
     func test_processTermination_withDeferredCancellation_mountsRecoveryWithoutWaiting_andKeepsSessionActive() throws {
         let overlay = SessionOverlayRequesterSpy()
         overlay.respondsToCancellation = false
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var completionCount = 0
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Pending", sourceURL: nil),
             onResponse: { _ in completionCount += 1 },
             onUnavailable: { XCTFail("Expected accepted request") }
@@ -57,7 +57,7 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
         XCTAssertTrue(hasMountedRecovery(in: sut))
         XCTAssertEqual(completionCount, 0)
 
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Next", sourceURL: nil),
             onResponse: { _ in },
             onUnavailable: { XCTFail("Process termination must not end the session") }
@@ -70,9 +70,9 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
 
     func test_processTermination_afterUserSelection_doesNotCancelCompletedDialog() {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var completionCount = 0
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Continue?", sourceURL: nil),
             onResponse: { _ in completionCount += 1 },
             onUnavailable: { XCTFail("Expected accepted request") }
@@ -88,10 +88,10 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
 
     func test_webKitCompletionReentersSessionEnd_retiresIDBeforeCompletion() {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var completionCount = 0
 
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Continue?", sourceURL: nil),
             onResponse: { _ in
                 completionCount += 1
@@ -107,8 +107,8 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
 
     func test_cancelResponseReentersSessionEnd_clearsIDBeforeCancellation() throws {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
-        sut.presentJavaScriptDialog(
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Continue?", sourceURL: nil),
             onResponse: { _ in sut.endSession() },
             onUnavailable: { XCTFail("Expected accepted request") }
@@ -122,9 +122,9 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
 
     func test_endingSessionTwice_keepsCancellationAndCompletionCountsAtOne() throws {
         let overlay = SessionOverlayRequesterSpy()
-        let sut = SessionWebView(overlayRequester: overlay)
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         var completionCount = 0
-        sut.presentJavaScriptDialog(
+        sut.presentDialog(
             SessionWebView.alertConfiguration(message: "Continue?", sourceURL: nil),
             onResponse: { _ in completionCount += 1 },
             onUnavailable: { XCTFail("Expected accepted request") }
@@ -141,15 +141,15 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
     func test_endingFirstSession_cannotCancelSecondSessionRequest() throws {
         let firstOverlay = SessionOverlayRequesterSpy()
         let secondOverlay = SessionOverlayRequesterSpy()
-        let first = SessionWebView(overlayRequester: firstOverlay)
-        let second = SessionWebView(overlayRequester: secondOverlay)
-        first.presentJavaScriptDialog(
+        let first = SessionWebView(dependencies: makeSessionDependencies(overlay: firstOverlay))
+        let second = SessionWebView(dependencies: makeSessionDependencies(overlay: secondOverlay))
+        first.presentDialog(
             SessionWebView.alertConfiguration(message: "First", sourceURL: nil),
             onResponse: { _ in },
             onUnavailable: { XCTFail("Expected first request") }
         )
         let firstID = try XCTUnwrap(firstOverlay.latestRequestID)
-        second.presentJavaScriptDialog(
+        second.presentDialog(
             SessionWebView.alertConfiguration(message: "Second", sourceURL: nil),
             onResponse: { _ in },
             onUnavailable: { XCTFail("Expected second request") }
@@ -165,9 +165,11 @@ final class SessionWebDialogRequestLifetimeTests: XCTestCase {
 
     func test_releasingSessionWebView_beforeDeferredCancellation_completesCapturedCompletionOnce() async throws {
         let overlay = SessionOverlayRequesterSpy()
-        var sut: SessionWebView? = SessionWebView(overlayRequester: overlay)
+        var sut: SessionWebView? = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: overlay)
+        )
         var completionCount = 0
-        sut?.presentJavaScriptDialog(
+        sut?.presentDialog(
             SessionWebView.alertConfiguration(message: "Continue?", sourceURL: nil),
             onResponse: { _ in completionCount += 1 },
             onUnavailable: { XCTFail("Expected accepted request") }

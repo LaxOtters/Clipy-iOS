@@ -91,6 +91,30 @@ final class SessionWebDialogConfigurationTests: XCTestCase {
         )
     }
 
+    func test_externalOpen_usesApprovedCopyAndButtonOrder() {
+        XCTAssertEqual(
+            SessionWebView.externalOpenConfiguration,
+            .message(
+                presentation: .plain,
+                title: "Open external app?",
+                body: "Clipy will open another app to continue.",
+                buttons: .dual(primaryTitle: "Continue", secondaryTitle: "Cancel")
+            )
+        )
+    }
+
+    func test_browserFallback_usesApprovedCopyAndButtonOrder() {
+        XCTAssertEqual(
+            SessionWebView.browserFallbackConfiguration,
+            .message(
+                presentation: .plain,
+                title: "Open in browser?",
+                body: "Downloads aren't supported in Clipy.",
+                buttons: .dual(primaryTitle: "Open in browser", secondaryTitle: "Cancel")
+            )
+        )
+    }
+
     func test_confirmPrimarySelection_returnsTrue() {
         XCTAssertTrue(
             SessionWebView.confirmResult(

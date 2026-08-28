@@ -7,7 +7,6 @@
 
 import UIKit
 
-import CoreDesignSystem
 import RxCocoa
 import RxSwift
 
@@ -19,10 +18,10 @@ final class SessionViewController: UIViewController {
 
     init(
         viewModel: SessionViewModel,
-        overlayRequester: any ClipyOverlayRequesting
+        dependencies: SessionFeature.Dependencies
     ) {
         self.viewModel = viewModel
-        rootView = SessionView(overlayRequester: overlayRequester)
+        rootView = SessionView(dependencies: dependencies)
         super.init(nibName: nil, bundle: nil)
     }
 

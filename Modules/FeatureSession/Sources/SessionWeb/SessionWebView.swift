@@ -17,6 +17,7 @@ import RxSwift
 final class SessionWebView: UIView {
     private let webView: WKWebView
     private let overlayRequester: any ClipyOverlayRequesting
+    private let openURL: @MainActor (URL) async -> Bool
     private var acceptedDialogRequestIDs: Set<ClipyDialog.RequestID> = []
     private var isSessionActive = true
     private var recoveryHostView: UIView?
@@ -32,10 +33,11 @@ final class SessionWebView: UIView {
 
     init(
         frame: CGRect = .zero,
-        overlayRequester: any ClipyOverlayRequesting
+        dependencies: SessionFeature.Dependencies
     ) {
         webView = WKWebView(frame: .zero)
-        self.overlayRequester = overlayRequester
+        overlayRequester = dependencies.overlayRequester
+        openURL = dependencies.openURL
         super.init(frame: frame)
         configureView()
         observeBrowserStateChanges()
@@ -269,7 +271,7 @@ extension SessionWebView {
         cancelAcceptedDialogs()
     }
 
-    func presentJavaScriptDialog(
+    func presentDialog(
         _ configuration: ClipyDialog.Configuration,
         onResponse: @escaping @MainActor (ClipyDialog.Response) -> Void,
         onUnavailable: @escaping @MainActor () -> Void
@@ -304,6 +306,27 @@ extension SessionWebView {
         case .rejected:
             onUnavailable()
         }
+    }
+
+    func externalOpenAction(for url: URL) -> @MainActor () -> Void {
+        // primary 선택 뒤에는 Session이 닫혀도 openURL 요청은 진행하고, 늦은 실패 안내만 버립니다.
+        let openURL = openURL
+        return { [weak self] in
+            Task { [weak self, openURL] in
+                let didOpen = await openURL(url)
+                guard let self, !didOpen, isSessionActive else {
+                    return
+                }
+                overlayRequester.enqueueSnackbar(.init(message: "Couldn't open external app"))
+            }
+        }
+    }
+
+    func showUnsupportedDownloadMessage() {
+        guard isSessionActive else {
+            return
+        }
+        overlayRequester.enqueueSnackbar(.init(message: "Downloads aren't supported"))
     }
 
     var currentURL: URL? {

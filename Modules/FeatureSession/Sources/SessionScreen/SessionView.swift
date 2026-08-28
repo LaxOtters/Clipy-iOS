@@ -8,7 +8,6 @@
 import Foundation
 import UIKit
 
-import CoreDesignSystem
 import RxCocoa
 import RxSwift
 
@@ -25,8 +24,8 @@ final class SessionView: UIView {
     private var renderedBottomSheetState = SessionChromeState.newSession.bottomSheetState
     private var isTrackingDockedKeyboard = false
 
-    init(overlayRequester: any ClipyOverlayRequesting) {
-        browserView = SessionWebView(overlayRequester: overlayRequester)
+    init(dependencies: SessionFeature.Dependencies) {
+        browserView = SessionWebView(dependencies: dependencies)
         super.init(frame: .zero)
         configureHierarchy()
         configureStyle()

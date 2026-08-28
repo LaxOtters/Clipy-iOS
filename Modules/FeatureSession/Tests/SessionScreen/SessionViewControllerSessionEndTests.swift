@@ -71,7 +71,10 @@ final class SessionViewControllerSessionEndTests: XCTestCase {
         fixtureURLs.append(fixtureURL)
         let sessionViewController = SessionFeature.makeViewController(
             context: SessionLaunchContext(sessionId: UUID(), initialURL: fixtureURL),
-            overlayRequester: overlay
+            dependencies: SessionFeature.Dependencies(
+                overlayRequester: overlay,
+                openURL: { _ in true }
+            )
         )
         let homeViewController = UIViewController()
         let navigationController = UINavigationController(

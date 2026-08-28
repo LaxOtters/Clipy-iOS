@@ -49,9 +49,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 return
             }
 
+            let dependencies = SessionFeature.Dependencies(
+                overlayRequester: overlayCoordinator,
+                openURL: { url in await UIApplication.shared.open(url) }
+            )
             let sessionViewController = SessionFeature.makeViewController(
                 context: context,
-                overlayRequester: overlayCoordinator
+                dependencies: dependencies
             )
             navigationController.pushViewController(sessionViewController, animated: true)
         }

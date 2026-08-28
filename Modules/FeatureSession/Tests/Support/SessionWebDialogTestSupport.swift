@@ -17,6 +17,7 @@ import RxSwift
 final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
     var rejection: ClipyDialog.RequestRejection?
     var onDialogPresented: (() -> Void)?
+    var onSnackbarEnqueued: ((ClipySnackbar.Request) -> Void)?
     var onCancelDialog: ((ClipyDialog.RequestID) -> Void)?
     var respondsToCancellation = true
 
@@ -62,6 +63,7 @@ final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
 
     func enqueueSnackbar(_ request: ClipySnackbar.Request) -> ClipySnackbar.EnqueueResult {
         snackbarRequests.append(request)
+        onSnackbarEnqueued?(request)
         return .accepted
     }
 
@@ -97,6 +99,40 @@ final class SessionOverlayRequesterSpy: ClipyOverlayRequesting {
 }
 
 @MainActor
+final class SessionURLOpenerSpy {
+    var result = true
+    var defersResult = false
+    private(set) var openedURLs: [URL] = []
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    func open(_ url: URL) async -> Bool {
+        openedURLs.append(url)
+        guard defersResult else {
+            return result
+        }
+        return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func complete(with result: Bool) {
+        let continuation = continuation
+        self.continuation = nil
+        continuation?.resume(returning: result)
+    }
+}
+
+@MainActor
+func makeSessionDependencies(
+    overlay: SessionOverlayRequesterSpy,
+    opener: SessionURLOpenerSpy? = nil
+) -> SessionFeature.Dependencies {
+    let opener = opener ?? SessionURLOpenerSpy()
+    return SessionFeature.Dependencies(
+        overlayRequester: overlay,
+        openURL: { url in await opener.open(url) }
+    )
+}
+
+@MainActor
 final class JavaScriptDialogHarness {
     let overlay: SessionOverlayRequesterSpy
     var sessionWebView: SessionWebView?
@@ -120,7 +156,9 @@ final class JavaScriptDialogHarness {
 
     init(overlay: SessionOverlayRequesterSpy = SessionOverlayRequesterSpy()) throws {
         self.overlay = overlay
-        let sessionWebView = SessionWebView(overlayRequester: overlay)
+        let sessionWebView = SessionWebView(
+            dependencies: makeSessionDependencies(overlay: overlay)
+        )
         sessionWebView.frame = CGRect(x: 0, y: 0, width: 390, height: 760)
         self.sessionWebView = sessionWebView
 

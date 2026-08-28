@@ -13,6 +13,7 @@ import RxSwift
 
 @testable import FeatureSession
 
+@MainActor
 final class SessionWebViewNavigationTests: XCTestCase {
     private var disposeBag: DisposeBag!
 
@@ -27,7 +28,8 @@ final class SessionWebViewNavigationTests: XCTestCase {
     }
 
     func test_navigationDelegate_preservesCommittedAndProvisionalFailureKinds() {
-        let sut = SessionWebView(overlayRequester: SessionOverlayRequesterSpy())
+        let overlay = SessionOverlayRequesterSpy()
+        let sut = SessionWebView(dependencies: makeSessionDependencies(overlay: overlay))
         let committedError = NSError(domain: "committed", code: 41)
         let provisionalError = NSError(domain: "provisional", code: 42)
         var failures: [SessionWebNavigationFailure] = []
@@ -46,6 +48,45 @@ final class SessionWebViewNavigationTests: XCTestCase {
                 .provisional(SessionWebNavigationFailureContext(error: provisionalError))
             ]
         )
+    }
+
+    func test_policyInterruption_emitsFailure_withoutRecovery_andAdjacentErrorUsesRecovery() throws {
+        let harness = try makeHistoryHarness()
+        try load(harness.firstURL, on: harness.webView, step: "load recovery fixture")
+        let policyInterruption = NSError(domain: "WebKitErrorDomain", code: 102)
+        let adjacentError = NSError(domain: "WebKitErrorDomain", code: 103)
+        var failures: [SessionWebNavigationFailure] = []
+
+        harness.webView.rx.navigationFailure
+            .emit(onNext: { failures.append($0) })
+            .disposed(by: disposeBag)
+
+        harness.webView.webView(
+            WKWebView(),
+            didFailProvisionalNavigation: nil,
+            withError: policyInterruption
+        )
+
+        XCTAssertEqual(
+            failures,
+            [.provisional(SessionWebNavigationFailureContext(error: policyInterruption))]
+        )
+        XCTAssertTrue(harness.snackbarMessages.isEmpty)
+
+        harness.webView.webView(
+            WKWebView(),
+            didFailProvisionalNavigation: nil,
+            withError: adjacentError
+        )
+
+        XCTAssertEqual(
+            failures,
+            [
+                .provisional(SessionWebNavigationFailureContext(error: policyInterruption)),
+                .provisional(SessionWebNavigationFailureContext(error: adjacentError))
+            ]
+        )
+        XCTAssertEqual(harness.snackbarMessages, ["Couldn't load this page"])
     }
 
     func test_load_emitsEffectiveURLProjection_beforeRealNavigationFinishes() throws {
@@ -243,11 +284,10 @@ private enum StepFailure: Error {
     case timedOut
 }
 
+@MainActor
 private final class SessionWebViewHistoryHarness {
-    let webView = SessionWebView(
-        frame: CGRect(x: 0, y: 0, width: 390, height: 760),
-        overlayRequester: SessionOverlayRequesterSpy()
-    )
+    private let overlay: SessionOverlayRequesterSpy
+    let webView: SessionWebView
     let firstName = "first-\(UUID().uuidString)"
     let secondName = "second-\(UUID().uuidString)"
     let firstURL: URL
@@ -255,12 +295,20 @@ private final class SessionWebViewHistoryHarness {
 
     var firstDisplayText: String { firstURL.absoluteString }
     var secondDisplayText: String { secondURL.absoluteString }
+    var snackbarMessages: [String] { overlay.snackbarRequests.map(\.message) }
 
     private let window: UIWindow
     private let fixtureDirectory: URL
     private var isTornDown = false
 
     init() throws {
+        let overlay = SessionOverlayRequesterSpy()
+        let webView = SessionWebView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 760),
+            dependencies: makeSessionDependencies(overlay: overlay)
+        )
+        self.overlay = overlay
+        self.webView = webView
         fixtureDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(
@@ -275,10 +323,6 @@ private final class SessionWebViewHistoryHarness {
         viewController.view.addSubview(webView)
         window.rootViewController = viewController
         window.isHidden = false
-    }
-
-    deinit {
-        tearDown()
     }
 
     func tearDown() {
