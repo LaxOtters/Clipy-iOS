@@ -22,7 +22,7 @@ final class SessionTopBarView: UIView {
 
     fileprivate let homeButton = UIButton(type: .system)
     private let titleLabel = UILabel()
-    private let addItemButton = UIButton(type: .system)
+    fileprivate let addItemButton = UIButton(type: .system)
     fileprivate let toggleButton = UIButton(type: .system)
     private let contentStackView = UIStackView()
     private var renderedState: SessionTopBarState = .unfolded
@@ -142,5 +142,9 @@ extension Reactive where Base: SessionTopBarView {
 
     var toggleTap: ControlEvent<Void> {
         base.toggleButton.rx.tap
+    }
+
+    var addItemTap: ControlEvent<Void> {
+        base.addItemButton.rx.tap
     }
 }

@@ -15,6 +15,7 @@ final class SessionViewController: UIViewController {
     private let viewModel: SessionViewModel
     private let disposeBag = DisposeBag()
     private var previousPopGestureEnabled: Bool?
+    private var addItemViewController: SessionAddItemViewController?
 
     init(
         viewModel: SessionViewModel,
@@ -74,6 +75,7 @@ final class SessionViewController: UIViewController {
             input: SessionViewModel.Input(
                 viewDidLoad: .just(()),
                 homeTap: rootView.rx.homeTap.asSignal(),
+                addItemTap: rootView.rx.addItemTap.asSignal(),
                 topBarToggleTap: rootView.rx.topBarToggleTap.asSignal(),
                 webRootScroll: rootView.rx.webRootScroll,
                 browserNavigationFinished: rootView.rx.navigationFinished,
@@ -132,6 +134,46 @@ final class SessionViewController: UIViewController {
         switch route {
         case .home:
             navigationController?.popViewController(animated: true)
+        case .addItem:
+            showAddItem()
         }
+    }
+
+    /// 앱 Dialog·Snackbar가 카드 위에 보이도록 modal 대신 Session 화면 안에 child로 붙입니다.
+    /// 카드는 열 때마다 새로 만들어, 닫으면 입력값이 남지 않습니다.
+    private func showAddItem() {
+        guard addItemViewController == nil else {
+            return
+        }
+
+        let addItemViewController = SessionAddItemViewController(
+            values: SessionAddItemForm.initialValues(currentPageURL: rootView.currentPageURL)
+        )
+        addItemViewController.onClose = { [weak self] in
+            self?.hideAddItem()
+        }
+
+        addChild(addItemViewController)
+        addItemViewController.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(addItemViewController.view)
+        NSLayoutConstraint.activate([
+            addItemViewController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            addItemViewController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            addItemViewController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            addItemViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        addItemViewController.didMove(toParent: self)
+        self.addItemViewController = addItemViewController
+    }
+
+    private func hideAddItem() {
+        guard let addItemViewController else {
+            return
+        }
+
+        addItemViewController.willMove(toParent: nil)
+        addItemViewController.view.removeFromSuperview()
+        addItemViewController.removeFromParent()
+        self.addItemViewController = nil
     }
 }
