@@ -11,6 +11,7 @@ import RxCocoa
 
 enum SessionRoute: Equatable {
     case home
+    case addItem
 }
 
 /// Session 화면에서 들어온 입력을 화면이 구독할 output으로 바꿉니다.
@@ -19,6 +20,7 @@ final class SessionViewModel {
     struct Input {
         let viewDidLoad: Signal<Void>
         let homeTap: Signal<Void>
+        let addItemTap: Signal<Void>
         let topBarToggleTap: Signal<Void>
         let webRootScroll: Signal<SessionWebRootScrollInput>
         /// 첫 navigation finish는 새 Session의 peek 상태를 유지하고, 그 다음 finish부터 browsing chrome으로 복원합니다.
@@ -62,8 +64,10 @@ final class SessionViewModel {
             .startWith(.newSession)
             .asDriver(onErrorDriveWith: .empty())
 
-        let route = input.homeTap
-            .map { SessionRoute.home }
+        let route = Signal.merge(
+            input.homeTap.map { SessionRoute.home },
+            input.addItemTap.map { SessionRoute.addItem }
+        )
 
         return Output(
             initialLoadURL: initialLoadURL,

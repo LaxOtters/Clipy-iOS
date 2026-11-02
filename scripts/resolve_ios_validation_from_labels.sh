@@ -165,7 +165,9 @@ add_capability_for_path() {
     .mise.toml|Tuist.swift|Workspace.swift|Tuist/*|Modules/*/Project.swift)
       add_capability "project-setup"
       ;;
-    Modules/AppMain/*)
+    # 로컬 WebView 테스트 페이지는 AppMain Debug 시작 주소 인자와 함께 쓰는 도구라 AppMain 검증에 묶습니다.
+    # 문서 경로가 아니라 docs로 보내면 docs-only 검사에서 막힙니다.
+    Modules/AppMain/*|scripts/webview-test-page/*)
       add_capability "app-main"
       ;;
     Modules/CoreDomain/*)

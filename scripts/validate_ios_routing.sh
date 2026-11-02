@@ -240,6 +240,14 @@ assert_exact_line \
   "CLIPY_IOS_VALIDATION_CAPABILITIES=module:FeatureSession:build" \
   "Changed path widens an incomplete AREA selection"
 
+webview_test_page_output="$(
+  resolve_requirements $'TYPE | Test\nAREA | AppMain' $'scripts/webview-test-page/index.html\nscripts/webview-test-page/files/sample.bin'
+)"
+assert_exact_line \
+  "$webview_test_page_output" \
+  "CLIPY_IOS_VALIDATION_CAPABILITIES=app-main" \
+  "Local WebView test page routes to AppMain"
+
 assert_resolve_fails \
   $'TYPE | Docs\nAREA | Docs' \
   'Modules/FeatureHome/Sources/HomeView.swift' \

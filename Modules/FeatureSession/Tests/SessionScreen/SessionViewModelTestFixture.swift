@@ -16,6 +16,7 @@ enum SessionViewModelTestFixture {
         context: SessionLaunchContext = SessionLaunchContext(sessionId: UUID()),
         viewDidLoad: Signal<Void> = Signal.empty(),
         homeTap: Signal<Void> = Signal.empty(),
+        addItemTap: Signal<Void> = Signal.empty(),
         topBarToggleTap: Signal<Void> = Signal.empty(),
         webRootScroll: Signal<SessionWebRootScrollInput> = Signal.empty(),
         browserNavigationFinished: Signal<Void> = Signal.empty(),
@@ -26,6 +27,7 @@ enum SessionViewModelTestFixture {
             input: SessionViewModel.Input(
                 viewDidLoad: viewDidLoad,
                 homeTap: homeTap,
+                addItemTap: addItemTap,
                 topBarToggleTap: topBarToggleTap,
                 webRootScroll: webRootScroll,
                 browserNavigationFinished: browserNavigationFinished,

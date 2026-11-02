@@ -47,6 +47,7 @@ final class ClipyColorContractTests: XCTestCase {
             (Palette.neutral950, (0x09090B, 1)),
             (Palette.error100, (0xFFDAD6, 1)),
             (Palette.error700, (0xBA1A1A, 1)),
+            (Palette.red500, (0xFF472F, 1)),
             (Palette.alphaWhite20, (0xFFFFFF, 0.2)),
             (Palette.alphaWhite70, (0xFFFFFF, 0.7)),
             (Palette.alphaWhite0Point2, (0xFFFFFF, 0.002)),

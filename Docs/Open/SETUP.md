@@ -134,6 +134,7 @@ module 사이에서 파일을 옮기거나 한글 파일명을 써도 기존 경
 `.swiftlint.yml`이 바뀌면 저장소 기본 도구만으로 YAML 형식을 확인합니다.
 SwiftLint 실행은 아직 저장소 toolchain과 CI 계약에 포함하지 않습니다.
 지원하지 않는 label이나 mapping이 없는 경로는 좁은 검증으로 추정하지 않고 실패합니다.
+`scripts/webview-test-page/`의 로컬 WebView 테스트 페이지는 AppMain Debug 시작 주소 인자와 함께 쓰므로, 바뀌면 AppMain 검증이 붙습니다.
 `TYPE | Docs`인데 코드성 capability가 발견되는 조합도 분류 오류로 실패합니다.
 manual dispatch에서 `docs-only`를 고를 때는 changed files 입력도 같이 넘겨야 합니다.
 

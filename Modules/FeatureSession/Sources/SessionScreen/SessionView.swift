@@ -150,6 +150,12 @@ extension SessionView {
         set { browserView.onRecoveryGoHome = newValue }
     }
 
+    /// 웹뷰가 가진 현재 URL입니다. 불러오는 중이거나 오류 화면이 덮였을 때는 화면에 보이는 페이지와 다를 수 있고,
+    /// 아직 아무 페이지도 없으면 nil입니다.
+    var currentPageURL: URL? {
+        browserView.currentURL
+    }
+
     func endSession() {
         browserView.endSession()
     }
@@ -193,6 +199,10 @@ extension Reactive where Base: SessionView {
 
     var topBarToggleTap: ControlEvent<Void> {
         base.topBarView.rx.toggleTap
+    }
+
+    var addItemTap: ControlEvent<Void> {
+        base.topBarView.rx.addItemTap
     }
 
     var webRootScroll: Signal<SessionWebRootScrollInput> {

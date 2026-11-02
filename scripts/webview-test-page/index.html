@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clipy WebView Test</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; padding: 16px; font: 16px/1.5 -apple-system, sans-serif; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 18px; margin: 28px 0 8px; padding-top: 12px; border-top: 1px solid #8884; scroll-margin-top: 120px; }
+    .lead, .expect, .note { color: #777; font-size: 14px; }
+    .case { margin: 10px 0 14px; }
+    .case > button, .case > a, .case > form button {
+      display: inline-block; padding: 8px 12px; border: 1px solid #8888; border-radius: 8px;
+      background: #8881; color: inherit; font: inherit; text-decoration: none;
+    }
+    .expect { margin: 4px 0 0; }
+    .expect::before { content: "Expect: "; font-weight: 600; }
+    #result, #via { padding: 8px 12px; border-radius: 8px; background: #2a7a2a22; }
+    #via:empty, #result:empty { display: none; }
+    iframe { width: 100%; height: 150px; border: 1px dashed #8888; border-radius: 8px; }
+    input, textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; }
+    code { font-size: 13px; }
+    .filler p { color: #999; }
+  </style>
+</head>
+<body>
+  <h1>Clipy WebView Test</h1>
+  <p class="lead">Each case lists what the app should show. Record the screen when the result differs.</p>
+  <p id="via"></p>
+  <p id="result"></p>
+
+  <h2 id="dialog">JS Dialog</h2>
+  <div class="case">
+    <button onclick="alert('This is an alert.')">alert</button>
+    <p class="expect">A Clipy Dialog appears and closes on Confirm.</p>
+  </div>
+  <div class="case">
+    <button onclick="showResult('confirm result: ' + confirm('Continue?'))">confirm</button>
+    <p class="expect">Confirm shows true, Cancel shows false in the result box above.</p>
+  </div>
+  <div class="case">
+    <button onclick="showResult('prompt result: ' + JSON.stringify(prompt('Enter a name', 'Clipy')))">prompt</button>
+    <p class="expect">A text Dialog prefilled with Clipy appears. The entered text or null shows in the result box.</p>
+  </div>
+  <div class="case">
+    <button onclick="delayedAlert(this)">alert after 3 seconds</button>
+    <p class="expect">After tapping, expand the bottom sheet. The Dialog appears above it after 3 seconds and still responds.</p>
+  </div>
+  <div class="case">
+    <button onclick="alert('First alert'); alert('Second alert')">two alerts in a row</button>
+    <p class="expect">The second appears after the first closes. They never overlap.</p>
+  </div>
+  <div class="case">
+    <iframe id="dialog-frame" title="Cross-origin iframe"></iframe>
+    <p class="expect">The Dialog from the iframe alert names a different host than the main page.</p>
+  </div>
+
+  <h2 id="new-window">New window requests</h2>
+  <div class="case">
+    <a href="/?via=target-blank" target="_blank">target=_blank link</a>
+    <p class="expect">Opens in the current WebView without a new window and shows "Opened via target-blank" above.</p>
+  </div>
+  <div class="case">
+    <button onclick="window.open('/?via=window-open')">window.open(url)</button>
+    <p class="expect">Opens in the current WebView and shows "Opened via window-open" above.</p>
+  </div>
+  <div class="case">
+    <form action="/echo" method="post" target="_blank">
+      <input type="hidden" name="message" value="hello clipy">
+      <input type="hidden" name="count" value="2">
+      <button type="submit">POST form target=_blank</button>
+    </form>
+    <p class="expect">The echo page opens in the current WebView with method POST and body <code>message=hello+clipy&amp;count=2</code>.</p>
+  </div>
+  <div class="case">
+    <button onclick="window.open('about:blank')">window.open('about:blank')</button>
+    <p class="expect">Nothing happens.</p>
+  </div>
+
+  <h2 id="external">External apps</h2>
+  <div class="case">
+    <a href="maps://?q=Seoul">maps:// link</a>
+    <p class="expect">"Open external app?" Dialog. Continue opens Maps.</p>
+  </div>
+  <div class="case">
+    <a href="clipy-unknown://test">Scheme with no handler</a>
+    <p class="expect">"Open external app?" Dialog. Continue shows the "Couldn't open external app" Snackbar.</p>
+  </div>
+  <div class="case">
+    <button onclick="openSchemeInFrame()">External scheme in an iframe</button>
+    <p class="expect">Nothing happens. Iframe requests are not handed to external apps.</p>
+  </div>
+  <div class="case">
+    <a href="/redirect?to=maps%3A%2F%2F%3Fq%3DRedirect">Server redirect to maps://</a>
+    <p class="expect">"Open external app?" Dialog.</p>
+  </div>
+
+  <h2 id="downloads">Downloads</h2>
+  <div class="case">
+    <a href="/files/sample.txt" download>Link with download attribute</a>
+    <p class="expect">"Open in browser?" Dialog.</p>
+  </div>
+  <div class="case">
+    <a href="/attachment">Content-Disposition: attachment response</a>
+    <p class="expect">"Downloads aren't supported" Snackbar. The page stays.</p>
+  </div>
+  <div class="case">
+    <a href="/files/sample.bin">File that cannot be displayed (.bin)</a>
+    <p class="expect">"Downloads aren't supported" Snackbar. The page stays.</p>
+  </div>
+  <div class="case">
+    <a href="data:text/plain;charset=utf-8,Clipy%20data%20download" download="clipy-data.txt">data: download link</a>
+    <p class="expect">"Downloads aren't supported" Snackbar.</p>
+  </div>
+
+  <h2 id="failures">Load failures</h2>
+  <p class="note">When a load fails while this page is open, the app keeps this page and shows a Snackbar instead of the error screen.</p>
+  <div class="case">
+    <a href="http://127.0.0.1:8799/">Connection refused</a>
+    <p class="expect">"Couldn't load this page" Snackbar. This page stays.</p>
+  </div>
+  <div class="case">
+    <a href="http://clipy-missing-host/">Unknown host</a>
+    <p class="expect">"Couldn't load this page" Snackbar. This page stays.</p>
+  </div>
+  <div class="case">
+    <a href="http://clipy-test.invalid/">Plain http external host (blocked by ATS)</a>
+    <p class="expect">"Couldn't load this page" Snackbar. This page stays.</p>
+  </div>
+  <div class="case">
+    <p>Stop the server, then tap ↻ in the bottom sheet</p>
+    <p class="expect">"Couldn't load this page" Snackbar. This page stays.</p>
+  </div>
+  <div class="case">
+    <a href="/status/500">Server 500 response</a>
+    <p class="expect">The server's 500 page shows, not the app error screen.</p>
+  </div>
+  <div class="case">
+    <a href="/missing-page">Missing path (404)</a>
+    <p class="expect">The server's 404 page shows, not the app error screen.</p>
+  </div>
+  <p class="note">To see a failure on the first load, pass one of the failing URLs above as the launch argument. The app error screen then appears: connection refused and unknown host use the server connection message, the ATS block uses the secure connection message.</p>
+
+  <h2 id="input">Input and scrolling</h2>
+  <div class="case">
+    <input type="text" placeholder="Single line">
+    <p class="expect">The keyboard appears. Watch how the page and the bottom sheet move with it.</p>
+  </div>
+  <div class="case">
+    <textarea rows="3" placeholder="Multiple lines"></textarea>
+  </div>
+  <div class="case">
+    <a href="#bottom">Jump to the bottom</a>
+    <p class="expect">Moves to the bottom of this page. Watch the bottom sheet and top bar while it scrolls.</p>
+  </div>
+  <div class="filler" id="filler"></div>
+  <p id="bottom"><a href="#">Back to top</a></p>
+
+  <script>
+    function showResult(text) {
+      document.getElementById('result').textContent = text;
+    }
+
+    function delayedAlert(button) {
+      button.disabled = true;
+      setTimeout(function () {
+        alert('Alert after 3 seconds.');
+        button.disabled = false;
+      }, 3000);
+    }
+
+    // 메인 페이지와 출처가 다른 iframe이어야 Dialog의 출처 표시를 구분할 수 있습니다.
+    function otherOrigin() {
+      var host = location.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+      return location.protocol + '//' + host + (location.port ? ':' + location.port : '');
+    }
+
+    function openSchemeInFrame() {
+      var frame = document.createElement('iframe');
+      frame.style.display = 'none';
+      frame.src = 'maps://?q=Iframe';
+      document.body.appendChild(frame);
+      showResult('Added an iframe with an external scheme.');
+    }
+
+    document.getElementById('dialog-frame').src = otherOrigin() + '/frame.html';
+
+    var via = new URLSearchParams(location.search).get('via');
+    if (via) {
+      document.getElementById('via').textContent = 'Opened via ' + via;
+    }
+
+    var filler = document.getElementById('filler');
+    for (var i = 1; i <= 40; i++) {
+      var line = document.createElement('p');
+      line.textContent = 'Scroll filler paragraph ' + i;
+      filler.appendChild(line);
+    }
+  </script>
+</body>
+</html>
