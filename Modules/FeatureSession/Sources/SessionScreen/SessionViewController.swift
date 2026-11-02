@@ -146,6 +146,9 @@ final class SessionViewController: UIViewController {
             return
         }
 
+        // 웹 입력칸 포커스가 남아 있으면 카드에 치는 글자가 뒤의 페이지로 들어갑니다.
+        view.endEditing(true)
+
         let addItemViewController = SessionAddItemViewController(
             values: SessionAddItemForm.initialValues(currentPageURL: rootView.currentPageURL)
         )
