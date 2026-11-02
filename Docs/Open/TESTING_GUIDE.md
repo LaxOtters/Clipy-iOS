@@ -217,10 +217,42 @@ UI test가 필요하더라도 가능한 조합을 모두 만들지 않습니다.
 
 실제 기능 화면에 연결된 뒤 여러 화면을 지나는 회귀가 생기고, 더 가벼운 테스트로 관찰할 수 없을 때 상시 UI test 여부를 다시 봅니다.
 
+#### WebView 테스트 페이지
+
+웹뷰의 JS Dialog, 새 창 요청, 외부 앱 열기, 다운로드, 로드 실패는 `scripts/webview-test-page/`의 로컬 페이지로 확인합니다.
+버튼마다 앱에서 보여야 할 결과가 적혀 있습니다.
+이 기대 결과는 현재 웹뷰 정책을 옮긴 것이므로, 정책을 바꾸면 페이지 문구도 함께 수정합니다.
+
+Mac에서 서버를 실행한 뒤 Debug 앱을 실행 인자와 함께 시뮬레이터에서 실행합니다.
+시뮬레이터는 Mac과 네트워크를 공유하므로 `127.0.0.1`로 Mac의 서버에 접속합니다.
+
+```sh
+python3 scripts/webview-test-page/serve.py
+
+mise exec -- tuist generate --no-open
+xcodebuild -workspace Clipy.xcworkspace -scheme AppMain \
+  -destination "platform=iOS Simulator,id=<UDID>" \
+  -derivedDataPath <DerivedData> build
+xcrun simctl install <UDID> <DerivedData>/Build/Products/Debug-iphonesimulator/AppMain.app
+xcrun simctl launch --terminate-running-process <UDID> com.laxotters.clipy.app \
+  -ClipyDebugSessionStartURL http://127.0.0.1:8780/
+```
+
+실행 인자는 앱을 새로 띄울 때만 적용되므로 `--terminate-running-process`로 떠 있는 앱을 먼저 종료합니다.
+주소 끝에 `#failures`처럼 섹션 id를 붙이면 그 섹션에서 시작합니다.
+
+Home에서 새 Session을 열면 테스트 페이지에서 시작합니다.
+첫 로드부터 실패하는 경우를 볼 때는 `http://127.0.0.1:8799/`처럼 실패할 주소를 실행 인자로 넘깁니다.
+탭과 스크린샷은 headless 시뮬레이터 제어 도구로 진행하고 Simulator.app은 열지 않습니다.
+
 ### 테스트를 위한 제품 코드 변경과 flaky test
 
 UI test를 위해 제품 코드에 별도 화면 이동 경로, 테스트 전용 상태, 넓어진 접근 범위를 추가하지 않습니다.
 `accessibilityIdentifier`는 실제 접근성 또는 지속해서 사용할 UI 자동화 경계일 때만 둡니다.
+
+예외로 AppMain은 Debug 빌드에서만 `-ClipyDebugSessionStartURL` 실행 인자를 읽어 새 Session의 시작 주소로 사용합니다.
+Session이 원래 받는 시작 주소 입력만 채우고 화면, 화면 이동 경로, 저장 상태는 추가하지 않으며, Release 빌드에는 포함되지 않습니다.
+웹뷰 동작을 재현하려면 앱이 테스트 페이지를 열 수 있어야 하는데, Session에는 주소창이 없기 때문입니다.
 
 flaky test는 재시도로 가리지 않습니다.
 제품 코드의 비결정성인지 실행 환경 문제인지 먼저 구분합니다.

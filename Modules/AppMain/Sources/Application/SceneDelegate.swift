@@ -44,7 +44,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         overlayContainerViewController.setHostDetachHandler { [weak overlayCoordinator] in
             overlayCoordinator?.hostDidDetach()
         }
-        let homeComposer = AppMainHomeComposer { [weak navigationController, weak overlayCoordinator] context in
+        let homeComposer = AppMainHomeComposer(
+            sessionStartURL: AppMainDebugLaunchArguments.sessionStartURL
+        ) { [weak navigationController, weak overlayCoordinator] context in
             guard let navigationController, let overlayCoordinator else {
                 return
             }
