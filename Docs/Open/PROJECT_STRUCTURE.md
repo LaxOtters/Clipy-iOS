@@ -66,6 +66,7 @@ Clipy-iOS/
         Color/
         Component/
           ActionMenu/
+          Input/
         Icon/
         Resource/
         Typography/
@@ -73,6 +74,7 @@ Clipy-iOS/
         Color/
         Component/
           ActionMenu/
+          Input/
         Icon/
         Typography/
 ```
@@ -246,6 +248,7 @@ Persistence, WebView, cache 같은 platform detail은 Domain 안으로 들어오
 Feature가 Foundation token을 화면마다 직접 선택하지 않도록 해, Figma semantic이 도입되면 Style mapping만 바꿀 수 있게 둡니다.
 Pretendard font 파일과 등록 과정은 `CoreDesignSystem` 내부에서 관리하며, Feature가 bundle 경로나 font 파일 이름을 직접 알지 않습니다.
 Action Menu도 item 목록과 표시·숨김 animation까지만 component가 맡고, 화면의 anchor·배치·dismiss 정책은 Feature가 맡습니다.
+입력 칸(`ClipyTextField`, `ClipyTextView`), 칸 헤더(`ClipyFieldHeader`), 팝업 헤더(`ClipyPopupHeader`)는 UIKit control 표면만 열고 closure property를 두지 않습니다. 입력 칸의 포커스 모양은 first responder 여부로만 그리고, 글자 수를 세는 일과 입력값 검증은 Feature가 맡습니다.
 
 Feature는 UIKit 화면, ViewController, ViewModel, 화면 action 처리를 맡습니다.
 Feature에서 local DB 구현체나 저장 schema를 직접 알지 않게 합니다.
