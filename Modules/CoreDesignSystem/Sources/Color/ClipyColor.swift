@@ -48,6 +48,8 @@ public enum ClipyColor {
         public static let error100 = UIColor(clipyHex: 0xFFDAD6)
         public static let error700 = UIColor(clipyHex: 0xBA1A1A)
 
+        public static let red500 = UIColor(clipyHex: 0xFF472F)
+
         public static let alphaWhite20 = UIColor(clipyHex: 0xFFFFFF, alpha: 0.2)
         public static let alphaWhite70 = UIColor(clipyHex: 0xFFFFFF, alpha: 0.7)
         public static let alphaWhite0Point2 = UIColor(clipyHex: 0xFFFFFF, alpha: 0.002)
