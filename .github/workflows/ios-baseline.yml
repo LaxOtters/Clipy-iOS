@@ -20,6 +20,7 @@ on:
       - "scripts/validate_ios_*.sh"
       - "scripts/validate_tuist_foundation.sh"
       - "scripts/resolve_ios_validation_from_labels.sh"
+      - "scripts/webview-test-page/**"
       - "Docs/Open/**"
       - "Docs/README.md"
       - "README.md"
